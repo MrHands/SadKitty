@@ -118,6 +118,7 @@ async function scrape() {
 		headless: false,
 	});
 	const page = await browser.newPage();
+	await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0');
 	
 	console.log('Loading main page...');
 
@@ -139,7 +140,19 @@ async function scrape() {
 
 	// wait for posts to appear
 
-	await page.waitForSelector('.user_posts');
+	try {
+		await page.waitForSelector('.user_posts', { timeout: 10000 });
+	} catch {
+		// try again
+
+		console.log('Trying again with Twitter...');
+
+		await page.type('input[name="session[username_or_email]"]', auth.username);
+		await page.type('input[name="session[password]"]', auth.password);
+		//await page.click('div[data-testid="LoginForm_Login_Button"]');
+
+		await page.waitForSelector('.user_posts', { timeout: 10000 });
+	}
 
 	console.log('Logged in.');
 
