@@ -95,20 +95,33 @@ async function scrapePost(page, author, url) {
 
 	await page.waitForSelector('.b-post__wrapper');
 
-	const sources = await page.evaluate(() => {
-		let sources = [];
+	let sources = [];
 
-		const eleSlide = document.querySelector('.swiper-wrapper');
-		if (eleSlide) {
-			sources = Array.from(eleSlide.querySelectorAll('img[draggable="false"]')).map(image => image.getAttribute('src'));
-		} else {
-			const eleImage = document.querySelector('.img-responsive');
-			if (eleImage) {
-				sources.push(eleImage.getAttribute('src'));
+	try {
+		// video
+
+		const playVideo = await page.waitForSelector('.video-js button', { timeout: 0 });
+		await playVideo.click();
+		const mp4 = await page.waitForSelector('.video-wrapper video > source[label="720"]', { timeout: 100 });
+		sources.push(mp4.getAttribute('src'));
+	} catch {
+		// images
+
+		sources = await page.evaluate(() => {
+			let sources = [];
+
+			const eleSlide = document.querySelector('.swiper-wrapper');
+			if (eleSlide) {
+				sources = Array.from(eleSlide.querySelectorAll('img[draggable="false"]')).map(image => image.getAttribute('src'));
+			} else {
+				const eleImage = document.querySelector('.img-responsive');
+				if (eleImage) {
+					sources.push(eleImage.getAttribute('src'));
+				}
 			}
-		}
-		return sources;
-	});
+			return sources;
+		});
+	}
 
 	const description = await page.$eval('.b-post__text-el', (element) => element.innerText);
 	const date = await page.$eval('.b-post__date > span', (element) => element.innerText);
