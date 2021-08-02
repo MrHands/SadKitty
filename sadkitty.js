@@ -47,13 +47,8 @@ db.serialize(() => {
 
 // scraping
 
-async function downloadMedia(url, author, post) {
+async function downloadMedia(url, index, author, post) {
 	return new Promise((resolve, reject) => {
-		// get filename from description
-
-		let fileName = post.description.replace(/[ ]/g, '_');
-		fileName = encodeURIComponent(fileName);
-	
 		// create directories
 
 		const authorPath = `./downloads/${author.id}`;
@@ -62,24 +57,19 @@ async function downloadMedia(url, author, post) {
 			fs.mkdirSync(authorPath, { recursive: true });
 		}
 
-		// make sure filename is unique
+		// get path
 
 		const encoded = new URL(url);
 		const extension = encoded.pathname.split('.').pop();
 
-		let dstPath = authorPath + '/' + fileName + '.' + extension;
+		let fileName = post.description.replace(/[ ]/g, '_');
+		fileName = encodeURIComponent(fileName);
 
-		let attempt = 0;
-		let exists = false;
-		do {
-			fs.exists(dstPath, (result) => {
-				exists = result;
-				if (exists) {
-					dstPath = authorPath + `/${fileName} (${attempt}).${extension}`;
-					attempt += 1;
-				}
-			});
-		} while(exists);
+		if (index > 0) {
+			filename += ` ${index + 1}`;
+		}
+
+		let dstPath = authorPath + '/' + fileName + '.' + extension;
 
 		// download file
 
@@ -128,7 +118,7 @@ async function scrapePost(page, author, url) {
 		description: description,
 		date: date,
 	};
-	await post.sources.map((url) => downloadMedia(url, author, post));
+	await post.sources.map((url, index) => downloadMedia(url, index, author, post));
 }
 
 async function scrapeMediaPage(page, author) {
@@ -137,8 +127,7 @@ async function scrapeMediaPage(page, author) {
 	await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_asc`, {
 		waitUntil: 'networkidle0',
 	});
-	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => post.id.match(/postId_(.+)/gi))[1]);
-	console.log(postIds);
+	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => post.id.match(/postId_(.+)/i)[1]));
 	await postIds.map((id) => scrapePost(page, author, `https://onlyfans.com/${id}/${author.id}`));
 }
 
