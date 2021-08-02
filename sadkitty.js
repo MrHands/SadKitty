@@ -5,6 +5,20 @@ const puppeteer = require('puppeteer');
 		headless: false,
 	});
 	const page = await browser.newPage();
-	// await page.setRequestInterception(true);
-	await page.goto('https://onlyfans.com');
+	page.on('console', (message) => {
+		console.log(message.text());
+	});
+
+	console.log('Loading main page...');
+
+	await page.goto('https://onlyfans.com', {
+		waitUntil: 'domcontentloaded',
+	});
+	let twitterLink = await page.waitForSelector('a.m-twitter');
+
+	console.log('Logging in...');
+
+	twitterLink.click();
+
+	// await page.click('a.m-twitter');
 })();
