@@ -62,11 +62,11 @@ async function downloadMedia(url, index, author, post) {
 		const encoded = new URL(url);
 		const extension = encoded.pathname.split('.').pop();
 
-		let fileName = post.description.replace(/[ ]/g, '_');
+		let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\| ]/g, '_');
 		fileName = encodeURIComponent(fileName);
 
 		if (index > 0) {
-			filename += ` ${index + 1}`;
+			fileName += ` ${index + 1}`;
 		}
 
 		let dstPath = authorPath + '/' + fileName + '.' + extension;
@@ -101,14 +101,19 @@ async function scrapePost(page, author, url) {
 
 	// check if locked
 
-	const locked = await page.waitForSelector('.post-purchase', { timeout: 0 });
-	if (locked) {
-		console.log('Post is locked, moving on.');
-	} else {
+	let locked = false;
+
+	try {
+		const eleLocked = await page.waitForSelector('.post-purchase', { timeout: 100 });
+		if (eleLocked) {
+			console.log('Post is locked.');
+			locked = true;
+		}
+	} catch (error) {
 		try {
 			// video
 
-			const playVideo = await page.waitForSelector('.video-js button', { timeout: 0 });
+			const playVideo = await page.waitForSelector('.video-js button', { timeout: 100 });
 			await playVideo.click();
 
 			console.log('Found video.');
@@ -123,7 +128,7 @@ async function scrapePost(page, author, url) {
 
 				const eleSlide = document.querySelector('.swiper-wrapper');
 				if (eleSlide) {
-					console.log('Found multiple iamges.');
+					console.log('Found multiple images.');
 					sources = Array.from(eleSlide.querySelectorAll('img[draggable="false"]')).map(image => image.getAttribute('src'));
 				} else {
 					const eleImage = document.querySelector('.img-responsive');
@@ -145,10 +150,13 @@ async function scrapePost(page, author, url) {
 		sources: sources,
 		description: description,
 		date: date,
-		locked: !!locked
+		locked: locked
 	};
-	for (const [url, index] of post.sources) {
+
+	let index = 0;
+	for (const url of post.sources) {
 		await downloadMedia(url, index, author, post);
+		index += 1;
 	}
 }
 
