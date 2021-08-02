@@ -8,32 +8,62 @@ const auth = require('./auth.json');
 
 // database
 
-let db = new sqlite3.Database('./storage.db');
-
 fs.exists('./storage.db', (exists) => {
 	if (!exists) {
-		db.serialize(() => {
-			db.run(`CREATE TABLE Author (
-				id TEXT PRIMARY KEY,
-				name TEXT NOT NULL,
-				url TEXT
-			)`);
-		
-			db.run(`CREATE TABLE Post (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				author_id TEXT NOT NULL,
-				url TEXT NOT NULL,
-				description TEXT,
-				timestamp TEXT
-			)`);
+		let db = new sqlite3.Database('./storage.db', (_err) => {
+
+			db.close();
 		});
-		db.close();
 	}
 });
 
+const authors = require('./authors.json');
+
+let db = new sqlite3.Database('./storage.db');
+db.serialize(() => {
+	db.run(`CREATE TABLE IF NOT EXISTS Author (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		url TEXT
+	)`);
+
+	db.run(`CREATE TABLE IF NOT EXISTS Post (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		author_id TEXT NOT NULL,
+		url TEXT NOT NULL,
+		description TEXT,
+		timestamp TEXT
+	)`);
+
+	newAuthors = [];
+	authors.forEach((author) => {
+		db.get('SELECT * FROM Author WHERE id = (?)', [author.id], (_this, _err, row) => {
+			console.log(_this);
+			console.log(_err);
+			console.log(row);
+			if (!row) {
+				newAuthors.push(author);
+			}
+		});
+	});
+
+	// console.log(newAuthors);
+
+	newAuthors.forEach(author => {
+		db.run('INSERT INTO Author (id, name, url) VALUES (?), (?), (?)', [author.id, author.name, `https://onlyfans.com/${author.id}`]);
+	});
+
+	db.all('SELECT * FROM Author', [], (_err, rows) => {
+		rows.forEach((row) => {
+			console.log(`name: ${row.name}`);
+		});
+	});
+});
+db.close();
+
 // scraping
 
-(async () => {
+/*(async () => {
 	const browser = await puppeteer.launch({
 		headless: false,
 	});
@@ -70,4 +100,4 @@ fs.exists('./storage.db', (exists) => {
 	});
 	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => post.id));
 	console.log(postIds);
-})();
+})();*/
