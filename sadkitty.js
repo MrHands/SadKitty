@@ -1,5 +1,7 @@
 const puppeteer = require('puppeteer');
 
+const auth = require('./auth.json');
+
 (async () => {
 	const browser = await puppeteer.launch({
 		headless: false,
@@ -20,5 +22,8 @@ const puppeteer = require('puppeteer');
 
 	twitterLink.click();
 
-	// await page.click('a.m-twitter');
+	await page.waitForSelector('#oauth_form');
+	page.type('#username_or_email', auth.username);
+	page.type('#password', auth.password);
+	page.click('#allow');
 })();
