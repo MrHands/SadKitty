@@ -89,6 +89,8 @@ async function downloadMedia(url, index, author, post) {
 }
 
 async function scrapePost(page, author, url) {
+	console.log(`Scraping ${url}...`);
+
 	await page.goto(url, {
 		waitUntil: 'domcontentloaded',
 	});
@@ -97,30 +99,43 @@ async function scrapePost(page, author, url) {
 
 	let sources = [];
 
-	try {
-		// video
+	// check if locked
 
-		const playVideo = await page.waitForSelector('.video-js button', { timeout: 0 });
-		await playVideo.click();
-		const mp4 = await page.waitForSelector('.video-wrapper video > source[label="720"]', { timeout: 100 });
-		sources.push(mp4.getAttribute('src'));
-	} catch {
-		// images
+	const locked = await page.waitForSelector('.post-purchase', { timeout: 0 });
+	if (locked) {
+		console.log('Post is locked, moving on.');
+	} else {
+		try {
+			// video
 
-		sources = await page.evaluate(() => {
-			let sources = [];
+			const playVideo = await page.waitForSelector('.video-js button', { timeout: 0 });
+			await playVideo.click();
 
-			const eleSlide = document.querySelector('.swiper-wrapper');
-			if (eleSlide) {
-				sources = Array.from(eleSlide.querySelectorAll('img[draggable="false"]')).map(image => image.getAttribute('src'));
-			} else {
-				const eleImage = document.querySelector('.img-responsive');
-				if (eleImage) {
-					sources.push(eleImage.getAttribute('src'));
+			console.log('Found video.');
+
+			const mp4 = await page.waitForSelector('.video-wrapper video > source[label="720"]', { timeout: 100 });
+			sources.push(mp4.getAttribute('src'));
+		} catch (error) {
+			// images
+
+			sources = await page.evaluate(() => {
+				let sources = [];
+
+				const eleSlide = document.querySelector('.swiper-wrapper');
+				if (eleSlide) {
+					console.log('Found multiple iamges.');
+					sources = Array.from(eleSlide.querySelectorAll('img[draggable="false"]')).map(image => image.getAttribute('src'));
+				} else {
+					const eleImage = document.querySelector('.img-responsive');
+					if (eleImage) {
+						console.log('Found single image.');
+						sources.push(eleImage.getAttribute('src'));
+					}
 				}
-			}
-			return sources;
-		});
+
+				return sources;
+			});
+		}
 	}
 
 	const description = await page.$eval('.b-post__text-el', (element) => element.innerText);
@@ -130,8 +145,11 @@ async function scrapePost(page, author, url) {
 		sources: sources,
 		description: description,
 		date: date,
+		locked: !!locked
 	};
-	await post.sources.map((url, index) => downloadMedia(url, index, author, post));
+	for (const [url, index] of post.sources) {
+		await downloadMedia(url, index, author, post);
+	}
 }
 
 async function scrapeMediaPage(page, author) {
@@ -141,7 +159,9 @@ async function scrapeMediaPage(page, author) {
 		waitUntil: 'networkidle0',
 	});
 	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => post.id.match(/postId_(.+)/i)[1]));
-	await postIds.map((id) => scrapePost(page, author, `https://onlyfans.com/${id}/${author.id}`));
+	for (const id of postIds) {
+		await scrapePost(page, author, `https://onlyfans.com/${id}/${author.id}`);
+	}
 }
 
 async function scrape() {
