@@ -1,6 +1,7 @@
+const fs = require('fs');
+const https = require('https');
 const puppeteer = require('puppeteer');
 const sqlite3 = require('sqlite3').verbose();
-const fs = require('fs');
 
 // authentication
 
@@ -46,17 +47,37 @@ db.serialize(() => {
 
 // scraping
 
-async function scrapePost(page, url) {
+async function downloadMedia(url, author, post) {
+	return new Promise((resolve, reject) => {
+		const extension = url.split('.').pop();
+		const fileName = encodeURIComponent(post.description);
+		const dstPath = `./downloads/${author.id}/${fileName}.${extension}`;
+	
+		if (!fs.existsSync(dstPath)) {
+			fs.mkdirSync(dstPath, { recursive: true });
+		}
+	
+		let file = fs.createWriteStream(dest);
+	
+		https.get(url, (response) => {
+			response.pipe(file);
+			resolve(dstPath);
+		}).on('error', (err) => {
+			fs.unlink(dstPath);
+			console.log(`Failed to download: ${err.message}`);
+			reject(err);
+		});
+	});
+}
+
+async function scrapePost(page, author, url) {
 	await page.goto(url, {
 		waitUntil: 'domcontentloaded',
 	});
 
 	await page.waitForSelector('.b-post__wrapper');
 
-	const description = await page.$eval('.b-post__text-el', (element) => element.innerText);
-	const date = await page.$eval('.b-post__date > span', (element) => element.innerText);
-
-	const imageSources = await page.evaluate(() => {
+	const sources = await page.evaluate(() => {
 		let sources = [];
 
 		const eleSlide = document.querySelector('.swiper-wrapper');
@@ -71,9 +92,15 @@ async function scrapePost(page, url) {
 		return sources;
 	});
 
-	console.log(description);
-	console.log(date);
-	console.log(imageSources);
+	const description = await page.$eval('.b-post__text-el', (element) => element.innerText);
+	const date = await page.$eval('.b-post__date > span', (element) => element.innerText);
+
+	const post = {
+		sources: sources,
+		description: description,
+		date: date,
+	};
+	await post.sources.map((url) => downloadMedia(url, author, post));
 }
 
 async function scrapeMediaPage(page, author) {
@@ -118,14 +145,14 @@ async function scrape() {
 
 	// scrape media pages
 
-	/*db.all('SELECT * FROM Author', [], (_err, rows) => {
+	db.all('SELECT * FROM Author', [], (_err, rows) => {
 		rows.forEach((row) => {
 			const author = Object.assign({}, row);
-			await scrapeMediaPage(page, author);
+			scrapePost(page, author, 'https://onlyfans.com/21001691/daintywilder');
+			//scrapePost(page, author, 'https://onlyfans.com/176755052/daintywilder');
+			// await scrapeMediaPage(page, author);
 		});
-	});*/
-	await scrapePost(page, 'https://onlyfans.com/21001691/daintywilder');
-	await scrapePost(page, 'https://onlyfans.com/176755052/daintywilder');
+	});
 }
 scrape();
 
