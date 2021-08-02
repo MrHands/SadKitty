@@ -55,11 +55,25 @@ async function scrapePost(page, url) {
 
 	const description = await page.$eval('.b-post__text-el', (element) => element.innerText);
 	const date = await page.$eval('.b-post__date > span', (element) => element.innerText);
-	const imageSource = await page.$eval('.img-responsive', (element) => element.getAttribute('src'));
+
+	const imageSources = await page.evaluate(() => {
+		let sources = [];
+
+		const eleSlide = document.querySelector('.swiper-wrapper');
+		if (eleSlide) {
+			sources = Array.from(eleSlide.querySelectorAll('img[draggable="false"]')).map(image => image.getAttribute('src'));
+		} else {
+			const eleImage = document.querySelector('.img-responsive');
+			if (eleImage) {
+				sources.push(eleImage.getAttribute('src'));
+			}
+		}
+		return sources;
+	});
 
 	console.log(description);
 	console.log(date);
-	console.log(imageSource);
+	console.log(imageSources);
 }
 
 async function scrapeMediaPage(page, author) {
@@ -110,6 +124,7 @@ async function scrape() {
 			await scrapeMediaPage(page, author);
 		});
 	});*/
+	await scrapePost(page, 'https://onlyfans.com/21001691/daintywilder');
 	await scrapePost(page, 'https://onlyfans.com/176755052/daintywilder');
 }
 scrape();
