@@ -16,14 +16,14 @@ const auth = require('./auth.json');
 	await page.goto('https://onlyfans.com', {
 		waitUntil: 'domcontentloaded',
 	});
-	let twitterLink = await page.waitForSelector('a.m-twitter');
+	await page.waitForSelector('form.b-loginreg__form');
 
 	console.log('Logging in...');
 
-	twitterLink.click();
+	await page.click('a.m-twitter');
 
-	await page.waitForSelector('#oauth_form');
-	page.type('#username_or_email', auth.username);
-	page.type('#password', auth.password);
-	page.click('#allow');
+	await page.waitForSelector('#oauth_token');
+	await page.type('#username_or_email', auth.username);
+	await page.type('#password', auth.password);
+	await page.click('#allow');
 })();
