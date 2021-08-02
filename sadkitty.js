@@ -119,7 +119,7 @@ async function scrape() {
 	});
 	const page = await browser.newPage();
 	await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0');
-	
+
 	console.log('Loading main page...');
 
 	await page.goto('https://onlyfans.com', {
@@ -131,34 +131,25 @@ async function scrape() {
 
 	console.log('Logging in...');
 
-	await page.click('a.m-twitter');
-
-	await page.waitForSelector('#oauth_token');
-	await page.type('#username_or_email', auth.username);
-	await page.type('#password', auth.password);
-	await page.click('#allow');
-
-	// wait for posts to appear
+	await page.type('input[name="email"]', auth.username);
+	await page.type('input[name="password"]', auth.password);
+	await page.click('button[type="submit"]');
 
 	try {
-		await page.waitForSelector('.user_posts', { timeout: 10000 });
+		await page.waitForSelector('.user_posts', { timeout: 2 * 60 * 1000 });
 	} catch {
-		// try again
-
-		console.log('Trying again with Twitter...');
-
-		await page.type('input[name="session[username_or_email]"]', auth.username);
-		await page.type('input[name="session[password]"]', auth.password);
-		//await page.click('div[data-testid="LoginForm_Login_Button"]');
-
-		await page.waitForSelector('.user_posts', { timeout: 10000 });
+		process.exit(0);
 	}
+
+	await page.waitForSelector('.user_posts', { timeout: 10000 });
 
 	console.log('Logged in.');
 
 	// scrape media pages
 
 	db.all('SELECT * FROM Author', [], (_err, rows) => {
+		console.log(_err);
+		console.log(rows);
 		rows.forEach((row) => {
 			const author = Object.assign({}, row);
 			scrapePost(page, author, 'https://onlyfans.com/21001691/daintywilder');
@@ -166,7 +157,7 @@ async function scrape() {
 			// await scrapeMediaPage(page, author);
 		});
 	});
+
+	db.close();
 }
 scrape();
-
-db.close();
