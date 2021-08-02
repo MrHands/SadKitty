@@ -9,8 +9,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "fs": "0.0.1-security",
     "isomorphic-fetch": "^3.0.0",
     "jsdom": "^16.7.0",
-    "puppeteer": "^10.1.0"
+    "puppeteer": "^10.1.0",
+    "sqlite3": "^5.0.2"
   }
 }

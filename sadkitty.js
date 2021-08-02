@@ -1,6 +1,37 @@
 const puppeteer = require('puppeteer');
+const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
+
+// authentication
 
 const auth = require('./auth.json');
+
+// database
+
+let db = new sqlite3.Database('./storage.db');
+
+fs.exists('./storage.db', (exists) => {
+	if (!exists) {
+		db.serialize(() => {
+			db.run(`CREATE TABLE Author (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL,
+				url TEXT
+			)`);
+		
+			db.run(`CREATE TABLE Post (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				author_id TEXT NOT NULL,
+				url TEXT NOT NULL,
+				description TEXT,
+				timestamp TEXT
+			)`);
+		});
+		db.close();
+	}
+});
+
+// scraping
 
 (async () => {
 	const browser = await puppeteer.launch({
