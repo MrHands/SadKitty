@@ -35,22 +35,8 @@ db.serialize(() => {
 		timestamp TEXT
 	)`);
 
-	newAuthors = [];
-	authors.forEach((author) => {
-		db.get('SELECT * FROM Author WHERE id = (?)', [author.id], (_this, _err, row) => {
-			console.log(_this);
-			console.log(_err);
-			console.log(row);
-			if (!row) {
-				newAuthors.push(author);
-			}
-		});
-	});
-
-	// console.log(newAuthors);
-
-	newAuthors.forEach(author => {
-		db.run('INSERT INTO Author (id, name, url) VALUES (?), (?), (?)', [author.id, author.name, `https://onlyfans.com/${author.id}`]);
+	authors.forEach(author => {
+		db.run(`INSERT OR IGNORE INTO Author (id, name, url) VALUES (?, ?, ?)`, [author.id, author.name, `https://onlyfans.com/${author.id}`]);
 	});
 
 	db.all('SELECT * FROM Author', [], (_err, rows) => {
@@ -59,6 +45,7 @@ db.serialize(() => {
 		});
 	});
 });
+
 db.close();
 
 // scraping
