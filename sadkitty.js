@@ -49,15 +49,29 @@ db.serialize(() => {
 
 async function downloadMedia(url, author, post) {
 	return new Promise((resolve, reject) => {
-		const extension = url.split('.').pop();
-		const fileName = encodeURIComponent(post.description);
-		const dstPath = `./downloads/${author.id}/${fileName}.${extension}`;
+		// get filename from description
+
+		let fileName = post.description.replace(/[ ]/g, '_');
+		fileName = encodeURIComponent(fileName);
 	
+		// create directories
+
+		let dstPath = `./downloads/${author.id}`;
+
 		if (!fs.existsSync(dstPath)) {
 			fs.mkdirSync(dstPath, { recursive: true });
 		}
+
+		const encoded = new URL(url);
+		const extension = encoded.pathname.split('.').pop();
+
+		dstPath += '/' + fileName + '.' + extension;
+
+		// download file
+
+		console.log(`Downloading to ${fileName}...`);
 	
-		let file = fs.createWriteStream(dest);
+		let file = fs.createWriteStream(dstPath);
 	
 		https.get(url, (response) => {
 			response.pipe(file);
@@ -131,12 +145,12 @@ async function scrape() {
 
 	console.log('Logging in...');
 
-	await page.type('input[name="email"]', auth.username);
-	await page.type('input[name="password"]', auth.password);
+	await page.type('input[name="email"]', auth.username, { delay: 10 });
+	await page.type('input[name="password"]', auth.password, { delay: 10 });
 	await page.click('button[type="submit"]');
 
 	try {
-		await page.waitForSelector('.user_posts', { timeout: 2 * 60 * 1000 });
+		await page.waitForSelector('.user_posts', { timeout: 4 * 60 * 1000 });
 	} catch {
 		process.exit(0);
 	}
@@ -148,8 +162,6 @@ async function scrape() {
 	// scrape media pages
 
 	db.all('SELECT * FROM Author', [], (_err, rows) => {
-		console.log(_err);
-		console.log(rows);
 		rows.forEach((row) => {
 			const author = Object.assign({}, row);
 			scrapePost(page, author, 'https://onlyfans.com/21001691/daintywilder');
