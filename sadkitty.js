@@ -66,7 +66,7 @@ async function downloadMedia(url, index, author, post) {
 		fileName = encodeURIComponent(fileName);
 
 		if (index > 0) {
-			fileName += ` ${index + 1}`;
+			fileName += `_(${index + 1})`;
 		}
 
 		let dstPath = authorPath + '/' + fileName + '.' + extension;
@@ -99,11 +99,11 @@ async function scrapePost(page, author, url) {
 
 	let sources = [];
 
-	// check if locked
-
 	let locked = false;
 
 	try {
+		// check if locked
+
 		const eleLocked = await page.waitForSelector('.post-purchase', { timeout: 100 });
 		if (eleLocked) {
 			console.log('Post is locked.');
@@ -142,6 +142,8 @@ async function scrapePost(page, author, url) {
 			});
 		}
 	}
+
+	console.log(sources);
 
 	const description = await page.$eval('.b-post__text-el', (element) => element.innerText);
 	const date = await page.$eval('.b-post__date > span', (element) => element.innerText);
