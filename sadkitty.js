@@ -56,20 +56,34 @@ async function downloadMedia(url, author, post) {
 	
 		// create directories
 
-		let dstPath = `./downloads/${author.id}`;
+		const authorPath = `./downloads/${author.id}`;
 
-		if (!fs.existsSync(dstPath)) {
-			fs.mkdirSync(dstPath, { recursive: true });
+		if (!fs.existsSync(authorPath)) {
+			fs.mkdirSync(authorPath, { recursive: true });
 		}
+
+		// make sure filename is unique
 
 		const encoded = new URL(url);
 		const extension = encoded.pathname.split('.').pop();
 
-		dstPath += '/' + fileName + '.' + extension;
+		let dstPath = authorPath + '/' + fileName + '.' + extension;
+
+		let attempt = 0;
+		let exists = false;
+		do {
+			fs.exists(dstPath, (result) => {
+				exists = result;
+				if (exists) {
+					dstPath = authorPath + `/${fileName} (${attempt}).${extension}`;
+					attempt += 1;
+				}
+			});
+		} while(exists);
 
 		// download file
 
-		console.log(`Downloading to ${fileName}...`);
+		console.log(`Downloading to ${dstPath.split('/').pop()}...`);
 	
 		let file = fs.createWriteStream(dstPath);
 	
@@ -148,6 +162,8 @@ async function scrape() {
 	await page.type('input[name="email"]', auth.username, { delay: 10 });
 	await page.type('input[name="password"]', auth.password, { delay: 10 });
 	await page.click('button[type="submit"]');
+
+	console.log('Waiting for reCAPTCHA...');
 
 	try {
 		await page.waitForSelector('.user_posts', { timeout: 4 * 60 * 1000 });
