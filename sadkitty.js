@@ -45,12 +45,32 @@ db.run(`CREATE TABLE IF NOT EXISTS Media (
 	file_path TEXT
 )`);
 
+const dbErrorHandler = (err) => {
+	if (err) {
+		console.error(err.message);
+	}
+
+	return !!err;
+}
+
+const dbRunHandler = (_result, err) => {
+	return dbErrorHandler(err);
+}
+
 // load authors
 
 const authors = require('./authors.json');
 db.serialize(() => {
 	authors.forEach(author => {
-		db.run(`INSERT OR IGNORE INTO Author (id, name, url) VALUES (?, ?, ?)`, [author.id, author.name, `https://onlyfans.com/${author.id}`]);
+		db.run(`INSERT OR IGNORE INTO Author (
+			id,
+			name,
+			url
+		) VALUES (?, ?, ?)`, [
+			author.id,
+			author.name,
+			`https://onlyfans.com/${author.id}`
+		], dbRunHandler);
 	});
 });
 
@@ -174,7 +194,11 @@ async function scrapePost(page, db, author, url) {
 	};
 
 	db.serialize(() => {
-		db.get('SELECT id, cache_media_count FROM Post WHERE url = ?', [url], (_err, row) => {
+		db.get('SELECT id, cache_media_count FROM Post WHERE url = ?', [url], (err, row) => {
+			if (dbErrorHandler(err)) {
+				return;
+			}
+
 			console.log(row);
 			if (row) {
 				post.id = row.id;
@@ -197,7 +221,7 @@ async function scrapePost(page, db, author, url) {
 				timestamp,
 				locked,
 				post.mediaCount
-			]);
+			], dbRunHandler);
 		}
 	});
 
@@ -211,7 +235,11 @@ async function scrapePost(page, db, author, url) {
 			AND url = ?`, [
 				post.id,
 				url
-			], (_err, row) => {
+			], (err, row) => {
+				if (dbErrorHandler(err)) {
+					return;
+				}
+
 				if (!row) {
 					queue.push(url);
 				}
@@ -232,7 +260,7 @@ async function scrapePost(page, db, author, url) {
 			WHERE id = ?`, [
 				post.mediaCount,
 				post.id
-			]);
+			], dbRunHandler);
 
 			db.run(`INSERT INTO Media (
 				post_id,
@@ -242,7 +270,7 @@ async function scrapePost(page, db, author, url) {
 				post.id,
 				url,
 				filePath
-			]);
+			], dbRunHandler);
 		});
 
 		index += 1;
@@ -262,11 +290,15 @@ async function scrapeMediaPage(page, db, author) {
 
 	db.serialize(() => {
 		for (const id of postIds) {
-			db.get('SELECT * FROM Post WHERE id = ?', [id], (_err, row) => {
+			db.get('SELECT * FROM Post WHERE id = ?', [id], (err, row) => {
+				if (dbErrorHandler(err)) {
+					return;
+				}
+
 				if (!row || (row.locked === 0 && row.cache_media_count === 0)) {
 					unseenPosts.push(id);
 				}
-			});
+			},);
 		}
 	});
 
@@ -311,12 +343,21 @@ async function scrape() {
 
 	// scrape media pages
 
-	db.all('SELECT * FROM Author', [], (_err, rows) => {
-		rows.forEach((row) => {
-			const author = Object.assign({}, row);
-			scrapeMediaPage(page, db, author);
-		});
+	let authors = [];
+
+	db.all('SELECT * FROM Author', [], (err, rows) => {
+		if (dbErrorHandler(err)) {
+			return;
+		}
+
+		Object.assign(authors, rows);
 	});
+
+	console.log(authors);
+
+	for (const author in authors) {
+		await scrapeMediaPage(page, db, author);
+	}
 
 	db.close();
 }
