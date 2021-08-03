@@ -125,13 +125,13 @@ async function downloadMedia(url, index, author, post) {
 		// get path
 
 		const encoded = new URL(url);
-		const extension = encoded.pathname.split('.').pop();
+		const extension = String(post.id) + '_' + encoded.pathname.split('.').pop();
 
 		let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\|\. ]/g, '_');
 		fileName = encodeURIComponent(fileName);
 
-		if (fileName.length > 100) {
-			fileName = fileName.substr(0, 50);
+		if (fileName.length > 80) {
+			fileName = fileName.substr(0, 80);
 		}
 
 		if (index > 0) {
@@ -226,7 +226,7 @@ async function scrapePost(page, db, author, url) {
 	try {
 		description = await page.$eval('.b-post__text-el', (element) => element.innerText);
 	} catch (errors) {
-		description = url;
+		description = 'none';
 	}
 
 	const timestamp = await page.$eval('.b-post__date > span', (element) => element.innerText);
@@ -244,7 +244,7 @@ async function scrapePost(page, db, author, url) {
 
 	await dbGetPromise('SELECT id, cache_media_count FROM Post WHERE url = ?', [url]).then((row) => {
 		if (row) {
-			post.id = row.id;
+			post.id = Number(row.id);
 			post.mediaCount = row.cache_media_count;
 		}
 	});
@@ -267,7 +267,7 @@ async function scrapePost(page, db, author, url) {
 		]);
 
 		await dbGetPromise('SELECT id FROM Post WHERE url = ?', [url]).then((row) => {
-			post.id = row.id;
+			post.id = Number(row.id);
 		});
 	}
 
