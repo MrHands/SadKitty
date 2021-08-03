@@ -59,9 +59,10 @@ const dbRunHandler = (_result, err) => {
 
 // load authors
 
-const authors = require('./authors.json');
+const authorData = require('./authors.json');
+
 db.serialize(() => {
-	authors.forEach(author => {
+	authorData.forEach(author => {
 		db.run(`INSERT OR IGNORE INTO Author (
 			id,
 			name,
@@ -307,7 +308,7 @@ async function scrapeMediaPage(page, db, author) {
 	}
 }
 
-async function scrape() {
+async function scrape(authors) {
 	const browser = await puppeteer.launch({
 		headless: false,
 	});
@@ -343,22 +344,26 @@ async function scrape() {
 
 	// scrape media pages
 
-	let authors = [];
+	for (const i in authors) {
+		const author = authors[i];
+		console.log(author);
+		await scrapeMediaPage(page, db, author);
+	}
+}
 
+db.serialize(() => {
 	db.all('SELECT * FROM Author', [], (err, rows) => {
 		if (dbErrorHandler(err)) {
 			return;
 		}
 
-		Object.assign(authors, rows);
+		let authors = [];
+
+		rows.forEach((row) => {
+			const author = Object.assign({}, row);
+			authors.push(author);
+		});
+
+		scrape(authors);
 	});
-
-	console.log(authors);
-
-	for (const author in authors) {
-		await scrapeMediaPage(page, db, author);
-	}
-
-	db.close();
-}
-scrape();
+});
