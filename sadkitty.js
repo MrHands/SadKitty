@@ -197,7 +197,14 @@ async function scrapePost(page, db, author, url) {
 
 	// wait for post to load
 
-	await page.waitForSelector('.b-post__wrapper');
+	for (let i = 1; i < 3; ++i) {
+		try {
+			await page.waitForSelector('.b-post__wrapper', { timeout: 10000 });
+		} catch (errors) {
+			console.log(`Reloading page, attempt ${i + 1}...`);
+			await page.reload();
+		}
+	}
 
 	let sources = [];
 
