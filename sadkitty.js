@@ -345,7 +345,6 @@ async function scrapeMediaPage(page, db, author) {
 	// get all seen posts
 
 	let seenPosts = [];
-	let unseenPosts = [];
 
 	await dbAllPromise('SELECT * FROM Post WHERE author_id = ?', author.id).then((rows) => {
 		seenPosts = rows.map(row => row.url);
@@ -358,8 +357,9 @@ async function scrapeMediaPage(page, db, author) {
 
 	// scroll down automatically every 3s
 
-	await page.evaluate(async (seenPosts, unseenPosts) => {
+	const unseenPosts = await page.evaluate(async (seenPosts) => {
 		await new Promise((resolve, _reject) => {
+			let unseenPosts = [];
 			let totalHeight = 0;
 			let distance = 768 * 2;
 			let timer = setInterval(() => {
@@ -372,7 +372,7 @@ async function scrapeMediaPage(page, db, author) {
 
 				let foundUnseen = [];
 				found.forEach(id => {
-					if (!seenPosts.includes(id)) {
+					if (!seenPosts.includes(id) && !unseenPosts.includes(id)) {
 						foundUnseen.push(id);
 					}
 				});
@@ -382,17 +382,19 @@ async function scrapeMediaPage(page, db, author) {
 
 				if (foundUnseen.length === 0 || totalHeight >= scrollHeight) {
 					clearInterval(timer);
-					resolve();
+					resolve(unseenPosts);
 				}
 
 				unseenPosts += foundUnseen;
 			}, 3000);
 		});
-	}, seenPosts, unseenPosts);
+	}, seenPosts);
 
 	// get posts
 
 	// const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => Number(post.id.match(/postId_(.+)/i)[1])));
+
+	console.log(unseenPosts);
 
 	if (unseenPosts.length === 0) {
 		console.log('All posts seen.')
