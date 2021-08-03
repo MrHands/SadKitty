@@ -122,8 +122,12 @@ async function downloadMedia(url, index, author, post) {
 		const encoded = new URL(url);
 		const extension = encoded.pathname.split('.').pop();
 
-		let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\| ]/g, '_');
+		let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\|\. ]/g, '_');
 		fileName = encodeURIComponent(fileName);
+
+		if (fileName.length > 50) {
+			fileName = fileName.substr(0, 50);
+		}
 
 		if (index > 0) {
 			fileName += `_(${index + 1})`;
@@ -133,9 +137,14 @@ async function downloadMedia(url, index, author, post) {
 
 		// download file
 
-		console.log(`Downloading to ${dstPath.split('/').pop()}...`);
+		console.log(`Downloading to "${dstPath.split('/').pop()}"...`);
 	
-		let file = fs.createWriteStream(dstPath);
+		let file;
+		try {
+			file = fs.createWriteStream(dstPath);
+		} catch (error) {
+			return reject(error);
+		}
 	
 		https.get(url, (response) => {
 			response.pipe(file);
@@ -143,7 +152,7 @@ async function downloadMedia(url, index, author, post) {
 		}).on('error', (err) => {
 			fs.unlink(dstPath);
 			console.log(`Failed to download: ${err.message}`);
-			reject(err);
+			return reject(err);
 		});
 	});
 }
@@ -224,57 +233,45 @@ async function scrapePost(page, db, author, url) {
 		mediaCount: 0,
 	};
 
-	db.serialize(() => {
-		db.get('SELECT id, cache_media_count FROM Post WHERE url = ?', [url], (err, row) => {
-			if (dbErrorHandler(err)) {
-				return;
-			}
-
-			console.log(row);
-			if (row) {
-				post.id = row.id;
-				post.mediaCount = row.cache_media_count;
-			}
-		});
-
-		if (post.id === 0) {
-			db.run(`INSERT INTO Post (
-				author_id,
-				url,
-				description,
-				timestamp,
-				locked,
-				cache_media_count
-			) VALUES (?, ?, ?, ?, ?, ?)`, [
-				author.id,
-				url,
-				encodeURIComponent(description),
-				timestamp,
-				locked,
-				post.mediaCount
-			], dbRunHandler);
+	await dbGetPromise('SELECT id, cache_media_count FROM Post WHERE url = ?', [url]).then((row) => {
+		console.log(row);
+		if (row) {
+			post.id = row.id;
+			post.mediaCount = row.cache_media_count;
 		}
 	});
+
+	if (post.id === 0) {
+		await dbRunPromise(`INSERT INTO Post (
+			author_id,
+			url,
+			description,
+			timestamp,
+			locked,
+			cache_media_count
+		) VALUES (?, ?, ?, ?, ?, ?)`, [
+			author.id,
+			url,
+			encodeURIComponent(description),
+			timestamp,
+			locked,
+			post.mediaCount
+		]);
+	}
 
 	let queue = [];
 
 	for (const url of post.sources) {
-		db.serialize(() => {
-			db.run(`SELECT *
-			FROM Media
-			WHERE post_id = ?
-			AND url = ?`, [
-				post.id,
-				url
-			], (err, row) => {
-				if (dbErrorHandler(err)) {
-					return;
-				}
-
-				if (!row) {
-					queue.push(url);
-				}
-			});
+		await dbGetPromise(`SELECT *
+		FROM Media
+		WHERE post_id = ?
+		AND url = ?`, [
+			post.id,
+			url
+		]).then((row) => {
+			if (!row) {
+				queue.push(url);
+			}
 		});
 	}
 
@@ -285,24 +282,22 @@ async function scrapePost(page, db, author, url) {
 
 		post.mediaCount += 1;
 
-		db.serialize(() => {
-			db.run(`UPDATE Post
-			SET cache_media_count = ?
-			WHERE id = ?`, [
-				post.mediaCount,
-				post.id
-			], dbRunHandler);
+		await dbRunPromise(`UPDATE Post
+		SET cache_media_count = ?
+		WHERE id = ?`, [
+			post.mediaCount,
+			post.id
+		]);
 
-			db.run(`INSERT INTO Media (
-				post_id,
-				url,
-				file_path
-			) VALUES (?, ?, ?)`, [
-				post.id,
-				url,
-				filePath
-			], dbRunHandler);
-		});
+		await dbRunPromise(`INSERT INTO Media (
+			post_id,
+			url,
+			file_path
+		) VALUES (?, ?, ?)`, [
+			post.id,
+			url,
+			filePath
+		]);
 
 		index += 1;
 	}
@@ -311,13 +306,11 @@ async function scrapePost(page, db, author, url) {
 async function scrapeMediaPage(page, db, author) {
 	// go to media page
 
-	/*await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_asc`, {
+	await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_asc`, {
 		waitUntil: 'networkidle0',
-	});*/
+	});
 
-	//const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => Number(post.id.match(/postId_(.+)/i)[1])));
-
-	const postIds = [ 125160941 ];
+	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => Number(post.id.match(/postId_(.+)/i)[1])));
 
 	let unseenPosts = [];
 
@@ -340,9 +333,7 @@ async function scrapeMediaPage(page, db, author) {
 }
 
 async function scrape(authors) {
-	const page = null;
-
-	/*const browser = await puppeteer.launch({
+	const browser = await puppeteer.launch({
 		headless: false,
 	});
 	const page = await browser.newPage();
@@ -373,7 +364,7 @@ async function scrape(authors) {
 
 	await page.waitForSelector('.user_posts', { timeout: 10000 });
 
-	console.log('Logged in.');*/
+	console.log('Logged in.');
 
 	// scrape media pages
 
