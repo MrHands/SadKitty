@@ -324,10 +324,10 @@ async function scrapeMediaPage(page, db, author) {
 
 	await page.waitForSelector('.user_posts');
 
-	// scroll down automatically
+	// scroll down automatically every 3s
 
 	await page.evaluate(async () => {
-		await new Promise((resolve, reject) => {
+		await new Promise((resolve, _reject) => {
 			let totalHeight = 0;
 			let distance = 100;
 			let timer = setInterval(() => {
@@ -339,7 +339,7 @@ async function scrapeMediaPage(page, db, author) {
 					clearInterval(timer);
 					resolve();
 				}
-			}, 1000);
+			}, 3000);
 		});
 	});
 
