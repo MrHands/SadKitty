@@ -114,12 +114,13 @@ async function scrapePost(page, author, url) {
 			// video
 
 			const playVideo = await page.waitForSelector('.video-js button', { timeout: 100 });
-			await playVideo.click();
 
 			console.log('Found video.');
 
-			const mp4 = await page.waitForSelector('.video-wrapper video > source[label="720"]', { timeout: 100 });
-			sources.push(mp4.getAttribute('src'));
+			await playVideo.click();
+
+			const videoSource = await page.$eval('video > source[label="720"]');
+			sources.push(videoSource.getAttribute('src'));
 		} catch (error) {
 			// images
 
@@ -145,7 +146,13 @@ async function scrapePost(page, author, url) {
 
 	console.log(sources);
 
-	const description = await page.$eval('.b-post__text-el', (element) => element.innerText);
+	let description = '';
+
+	try {
+		description = await page.$eval('.b-post__text-el', (element) => element.innerText);
+	} catch (errors) {
+	}
+
 	const date = await page.$eval('.b-post__date > span', (element) => element.innerText);
 
 	const post = {
