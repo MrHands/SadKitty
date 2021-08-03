@@ -212,16 +212,19 @@ async function scrapePost(page, db, author, url) {
 		if (eleVideo) {
 			console.log('Found video.');
 
-			await page.waitForSelector('video > source[label="720"]', { timeout: 2000 });
-
-			console.log('Grabbing source.');
+			eleVideo.click();
 
 			try {
+				await page.waitForSelector('video > source[label="720"]', { timeout: 2000 });
+
+				console.log('Grabbing source.');
+
 				const videoSource = await page.$eval('video > source[label="720"]', (element) => element.getAttribute('src'));
 				if (!sources.includes(videoSource)) {
 					sources.push(videoSource);
 				}
 			} catch (error) {
+				console.log('Failed to grab source: ' + error.message);
 			}
 		}
 
@@ -231,21 +234,29 @@ async function scrapePost(page, db, author, url) {
 		if (eleSwiper) {
 			console.log('Found multiple images.');
 
-			const found = await page.$$eval('img[draggable="false"]', elements => elements.map(image => image.getAttribute('src')));
-			found.forEach(imageSource => {
-				if (!sources.includes(imageSource)) {
-					sources.push(imageSource);
-				}
-			});
+			try {
+				const found = await page.$$eval('img[draggable="false"]', elements => elements.map(image => image.getAttribute('src')));
+				found.forEach(imageSource => {
+					if (!sources.includes(imageSource)) {
+						sources.push(imageSource);
+					}
+				});
+			} catch (error) {
+				console.log('Failed to grab source: ' + error.message);
+			}
 		}
 
 		const eleImage = await getPageElement(page, '.img-responsive', 1000);
 		if (eleImage) {
 			console.log('Found single image.');
 
-			const imageSource = await page.$eval('.img-responsive', (element) => element.getAttribute('src'));
-			if (!sources.includes(imageSource)) {
-				sources.push(imageSource);
+			try {
+				const imageSource = await page.$eval('.img-responsive', (element) => element.getAttribute('src'));
+				if (!sources.includes(imageSource)) {
+					sources.push(imageSource);
+				}
+			} catch (error) {
+				console.log('Failed to grab source: ' + error.message);
 			}
 		}
 
