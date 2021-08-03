@@ -385,7 +385,10 @@ async function scrapeMediaPage(page, db, author) {
 					resolve(unseenPosts);
 				}
 
-				unseenPosts += foundUnseen;
+				foundUnseen.forEach(id => {
+					unseenPosts.push(id);
+				})
+				console.log(unseenPosts);
 			}, 3000);
 		});
 	}, seenPosts);
