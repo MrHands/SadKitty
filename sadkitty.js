@@ -220,6 +220,7 @@ async function scrapePost(page, db, author, url) {
 				try {
 					await page.waitForSelector(`video > source[label="${qualityLevels[q]}"]`, { timeout: 2000 });
 					quality = qualityLevels[q];
+					break;
 				} catch {
 					continue;
 				}
@@ -494,10 +495,19 @@ async function scrapeMediaPage(page, db, author) {
 	}
 }
 
-async function scrape(authors) {
-	for (const author in Object.entries(authorData)) {
-		console.log(author);
+async function scrape() {
+	// get authors
+
+	let authors = [];
+	for (const data of authorData) {
+		await dbGetPromise('SELECT * FROM Author WHERE id = ?', data.id).then((author) => {
+			authors.push(author);
+		});
 	}
+
+	console.log(authors);
+
+	// open browser
 
 	const browser = await puppeteer.launch({
 		headless: false,
@@ -529,6 +539,8 @@ async function scrape(authors) {
 	try {
 		await page.waitForSelector('.user_posts', { timeout: 4 * 60 * 1000 });
 	} catch {
+		console.log('Timed out.');
+
 		process.exit(0);
 	}
 
@@ -550,20 +562,4 @@ async function scrape(authors) {
 
 	process.exit(0);
 }
-
-db.serialize(() => {
-	db.all('SELECT * FROM Author', [], (err, rows) => {
-		if (dbErrorHandler(err)) {
-			return;
-		}
-
-		let authors = [];
-
-		rows.forEach((row) => {
-			const author = Object.assign({}, row);
-			authors.push(author);
-		});
-
-		scrape(authors);
-	});
-});
+scrape();
