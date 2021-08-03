@@ -169,14 +169,25 @@ async function scrapePost(page, author, url) {
 	}
 }
 
-async function scrapeMediaPage(page, author) {
+async function scrapeMediaPage(page, db, author) {
 	// go to media page
 
 	await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_asc`, {
 		waitUntil: 'networkidle0',
 	});
+
+	let unseenPosts = [];
+
 	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => post.id.match(/postId_(.+)/i)[1]));
 	for (const id of postIds) {
+		db.get('SELECT * FROM Post WHERE id = ?', [id], (_err, row) => {
+			if (!row) {
+				unseenPosts.push(id);
+			}
+		});
+	}
+
+	for (const id of unseenPosts) {
 		await scrapePost(page, author, `https://onlyfans.com/${id}/${author.id}`);
 	}
 }
@@ -220,7 +231,7 @@ async function scrape() {
 	db.all('SELECT * FROM Author', [], (_err, rows) => {
 		rows.forEach((row) => {
 			const author = Object.assign({}, row);
-			scrapeMediaPage(page, author);
+			scrapeMediaPage(page, db, author);
 		});
 	});
 
