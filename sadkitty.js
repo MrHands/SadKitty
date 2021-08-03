@@ -430,7 +430,7 @@ async function scrapeMediaPage(page, db, author) {
 		WHERE author_id = ?
 		AND cache_media_count > 0`, author.id)
 		.then((rows) => {
-			seenPosts = rows.map(row => row.url);
+			seenPosts = rows.map(row => Number(row.url.match(/.*\/(\d+).*/)[1]));
 		});
 
 	console.log(seenPosts);
