@@ -221,8 +221,6 @@ async function scrapePost(page, db, author, url) {
 		}
 	}
 
-	console.log(sources);
-
 	let description = '';
 
 	try {
@@ -324,6 +322,29 @@ async function scrapeMediaPage(page, db, author) {
 		waitUntil: 'networkidle0',
 	});
 
+	await page.waitForSelector('.user_posts');
+
+	// scroll down automatically
+
+	await page.evaluate(async () => {
+		await new Promise((resolve, reject) => {
+			let totalHeight = 0;
+			let distance = 100;
+			let timer = setInterval(() => {
+				let scrollHeight = document.body.scrollHeight;
+				window.scrollBy(0, distance);
+				totalHeight += distance;
+
+				if (totalHeight >= scrollHeight) {
+					clearInterval(timer);
+					resolve();
+				}
+			}, 1000);
+		});
+	});
+
+	// get posts
+
 	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => Number(post.id.match(/postId_(.+)/i)[1])));
 
 	let unseenPosts = [];
@@ -350,6 +371,10 @@ async function scrape(authors) {
 	});
 	const page = await browser.newPage();
 	await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0');
+	await page.setViewport({
+		width: 1280,
+		height: 720
+	});
 
 	console.log('Loading main page...');
 
