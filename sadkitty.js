@@ -44,6 +44,18 @@ const dbRunPromise = (sql, params) => {
 	});
 };
 
+const dbAllPromise = (sql, params) => {
+	return new Promise((resolve, reject) => {
+		db.all(sql, params, (err, rows) => {
+			if (err) {
+				return reject(err);
+			}
+
+			resolve(rows);
+		})
+	});
+};
+
 const dbSerializePromise = () => {
 	return new Promise((resolve, _reject) => {
 		db.serialize(() => {
@@ -134,9 +146,7 @@ async function downloadMedia(url, index, author, post) {
 			fileName = fileName.substr(0, 80);
 		}
 
-		const postMatch = post.url.match(/.*\/(\d+).*/g);
-		console.log(post.url);
-		console.log(postMatch);
+		const postMatch = post.url.match(/.*\/(\d+).*/);
 		fileName += ` [${postMatch[1]}]`;
 
 		if (index > 0) {
@@ -328,13 +338,27 @@ async function scrapeMediaPage(page, db, author) {
 
 	// go to media page
 
-	await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_asc`, {
+	await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_desc`, {
 		waitUntil: 'networkidle0',
 	});
+
+	// get all seen posts
+
+	let seenPosts = [];
+	let unseenPosts = [];
+
+	await dbAllPromise('SELECT * FROM Post WHERE author_id = ?', author.id).then((rows) => {
+		seenPosts = rows.map(row => row.url);
+	});
+	console.log(seenPosts);
+
+	// wait for page to load
 
 	await page.waitForSelector('.user_posts');
 
 	// scroll down automatically every 3s
+
+	const logger = console.log;
 
 	await page.evaluate(async () => {
 		await new Promise((resolve, _reject) => {
@@ -345,38 +369,41 @@ async function scrapeMediaPage(page, db, author) {
 				window.scrollBy(0, distance);
 				totalHeight += distance;
 
-				if (totalHeight >= scrollHeight) {
+				let found = Array.from(document.querySelectorAll('.user_posts .b-post')).map(post => Number(post.id.match(/postId_(.+)/i)[1]));
+				logger(found);
+
+				let foundUnseen = [];
+				found.forEach(id => {
+					if (!seenPosts.includes(id)) {
+						foundUnseen.push(id);
+					}
+				});
+				logger(foundUnseen);
+
+				logger(`Found ${foundUnseen.length} new posts...`);
+
+				if (foundUnseen.length === 0 || totalHeight >= scrollHeight) {
 					clearInterval(timer);
 					resolve();
 				}
+
+				unseenPosts += foundUnseen;
 			}, 3000);
 		});
 	});
 
 	// get posts
 
-	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => Number(post.id.match(/postId_(.+)/i)[1])));
-	
-	console.log(`Found ${postIds.length} post(s).`);
-
-	// filter
-
-	console.log('Filtering unseen posts...');
-
-	let unseenPosts = [];
-
-	for (const id of postIds) {
-		await dbGetPromise(`SELECT * FROM Post WHERE id = ?`, id).then((row) => {
-			if (!row || (row.locked === 0 && row.cache_media_count === 0)) {
-				unseenPosts.push(id);
-			}
-		});
-	}
+	// const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => Number(post.id.match(/postId_(.+)/i)[1])));
 
 	if (unseenPosts.length === 0) {
 		console.log('All posts seen.')
 		return;
 	}
+
+	// oldest to newest
+
+	unseenPosts.reverse();
 
 	console.log(`Found ${unseenPosts.length} unseen post(s).`);
 
