@@ -134,7 +134,7 @@ async function downloadMedia(url, index, author, post) {
 			fileName = fileName.substr(0, 80);
 		}
 
-		const postMatch = url.match(/.*\/(\d+).*/g);
+		const postMatch = post.url.match(/.*\/(\d+).*/g);
 		fileName += ` [${postMatch[1]}]`;
 
 		if (index > 0) {
@@ -238,6 +238,7 @@ async function scrapePost(page, db, author, url) {
 
 	let post = {
 		id: 0,
+		url: url,
 		sources: sources,
 		description: description,
 		date: timestamp,
@@ -336,7 +337,7 @@ async function scrapeMediaPage(page, db, author) {
 	await page.evaluate(async () => {
 		await new Promise((resolve, _reject) => {
 			let totalHeight = 0;
-			let distance = 720 * 2;
+			let distance = 768 * 3;
 			let timer = setInterval(() => {
 				let scrollHeight = document.body.scrollHeight;
 				window.scrollBy(0, distance);
@@ -389,8 +390,8 @@ async function scrape(authors) {
 	const page = await browser.newPage();
 	await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0');
 	await page.setViewport({
-		width: 1280,
-		height: 720
+		width: 1024,
+		height: 768
 	});
 
 	console.log('Loading main page...');
