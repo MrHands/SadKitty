@@ -373,21 +373,23 @@ async function scrapeMediaPage(page, db, author) {
 
 				let foundUnseen = [];
 				found.forEach(id => {
-					if (!seenPosts.includes(id) && !unseenPosts.includes(id)) {
+					if (!seenPosts.includes(id)) {
 						foundUnseen.push(id);
 					}
 				});
 				console.log(foundUnseen);
 
-				console.log(`Found ${foundUnseen.length} new posts...`);
+				console.log(`Found ${foundUnseen.length} posts...`);
 
 				if (totalHeight >= scrollHeight) {
 					clearInterval(timer);
 					resolve(unseenPosts);
 				}
 
-				foundUnseen.forEach(id => {
-					unseenPosts.push(id);
+				found.forEach(id => {
+					if (!unseenPosts.includes(id)) {
+						unseenPosts.push(id);
+					}
 				})
 				console.log(unseenPosts);
 			}, 3000);
