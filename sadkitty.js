@@ -360,7 +360,7 @@ async function scrapeMediaPage(page, db, author) {
 
 	const logger = console.log;
 
-	await page.evaluate(async (logger, seenPosts) => {
+	await page.evaluate(async (logger, seenPosts, unseenPosts) => {
 		await new Promise((resolve, _reject) => {
 			let totalHeight = 0;
 			let distance = 768 * 2;
@@ -390,7 +390,7 @@ async function scrapeMediaPage(page, db, author) {
 				unseenPosts += foundUnseen;
 			}, 3000);
 		});
-	}, logger, seenPosts);
+	}, logger, seenPosts, unseenPosts);
 
 	// get posts
 
