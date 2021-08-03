@@ -421,28 +421,34 @@ async function scrapeMediaPage(page, db, author) {
 
 		await new Promise((resolve, _reject) => {
 			let totalHeight = 0;
-			let distance = 768 * 2;
+			let distance = 768 * 2 + 1;
+			let prevScrollHeight = 0;
 			let timer = setInterval(() => {
 				let scrollHeight = document.body.scrollHeight;
 				window.scrollBy(0, distance);
 				totalHeight += distance;
 
-				let found = Array.from(document.querySelectorAll('.user_posts .b-post')).map(post => Number(post.id.match(/postId_(.+)/i)[1]));
-				console.log(found);
+				if (prevScrollHeight !== scrollHeight) {
+					console.log(`prevScrollHeight ${prevScrollHeight} scrollHeight ${scrollHeight}`);
+					prevScrollHeight = scrollHeight;
 
-				let foundUnseen = [];
-				found.forEach(id => {
-					if (!seenPosts.includes(id) && !unseenPosts.includes(id)) {
-						foundUnseen.push(id);
-					}
-				});
-				console.log(foundUnseen);
-
-				console.log(`Found ${foundUnseen.length} new posts...`);
-
-				unseenPosts = unseenPosts.concat(foundUnseen);
-				console.log(unseenPosts);
-				console.log(`Total: ${unseenPosts.length}`);
+					let found = Array.from(document.querySelectorAll('.user_posts .b-post')).map(post => Number(post.id.match(/postId_(.+)/i)[1]));
+					console.log(found);
+	
+					let foundUnseen = [];
+					found.forEach(id => {
+						if (!seenPosts.includes(id) && !unseenPosts.includes(id)) {
+							foundUnseen.push(id);
+						}
+					});
+					console.log(foundUnseen);
+	
+					console.log(`Found ${foundUnseen.length} new posts...`);
+	
+					unseenPosts = unseenPosts.concat(foundUnseen);
+					console.log(unseenPosts);
+					console.log(`Total: ${unseenPosts.length}`);
+				}
 
 				// check if we've scrolled down the entire page
 
