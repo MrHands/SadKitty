@@ -124,6 +124,15 @@ db.serialize(() => {
 
 // scraping
 
+async function getPageElement(page, selector, timeout = 100) {
+	try {
+		const element = await page.waitForSelector(selector, { timeout: timeout });
+		return element;
+	} catch {
+		return null;
+	}
+}
+
 async function downloadMedia(url, index, author, post) {
 	return new Promise((resolve, reject) => {
 		// create directories
@@ -186,86 +195,108 @@ async function scrapePost(page, db, author, url) {
 		waitUntil: 'domcontentloaded',
 	});
 
+	// wait for post to load
+
 	await page.waitForSelector('.b-post__wrapper');
 
 	let sources = [];
 
-	let locked = 0;
-
-	try {
-		// check if locked
-
-		const eleLocked = await page.waitForSelector('.post-purchase', { timeout: 100 });
-		if (eleLocked) {
-			console.log('Post is locked.');
-			locked = 1;
+	for (let i = 0; i < 4; ++i) {
+		if (i > 0) {
+			console.log(`Attempt to scrape ${i + 1}...`);
 		}
-	} catch (error) {
-		try {
-			// video
 
-			const playVideo = await page.waitForSelector('.video-js button', { timeout: 100 });
+		// get video
 
+		const eleVideo = await getPageElement(page, '.video-js button', 1000);
+		if (eleVideo) {
 			console.log('Found video.');
 
-			await playVideo.click();
 			await page.waitForSelector('video > source[label="720"]', { timeout: 2000 });
 
 			console.log('Grabbing source.');
 
-			const videoSource = await page.$eval('video > source[label="720"]', (element) => element.getAttribute('src'));
-			sources.push(videoSource);
-		} catch (error) {
-			// images
-
-			sources = await page.evaluate(() => {
-				let sources = [];
-
-				const eleSlide = document.querySelector('.swiper-wrapper');
-				if (eleSlide) {
-					console.log('Found multiple images.');
-					sources = Array.from(eleSlide.querySelectorAll('img[draggable="false"]')).map(image => image.getAttribute('src'));
-				} else {
-					const eleImage = document.querySelector('.img-responsive');
-					if (eleImage) {
-						console.log('Found single image.');
-						sources.push(eleImage.getAttribute('src'));
-					}
+			try {
+				const videoSource = await page.$eval('video > source[label="720"]', (element) => element.getAttribute('src'));
+				if (!sources.includes(videoSource)) {
+					sources.push(videoSource);
 				}
+			} catch (error) {
+			}
+		}
 
-				return sources;
+		// get image(s)
+
+		const eleSwiper = await getPageElement(page, '.swiper-wrapper', 1000);
+		if (eleSwiper) {
+			console.log('Found multiple images.');
+
+			const found = await page.$$eval('img[draggable="false"]', elements => elements.map(image => image.getAttribute('src')));
+			found.forEach(imageSource => {
+				if (!sources.includes(imageSource)) {
+					sources.push(imageSource);
+				}
 			});
+		}
+
+		const eleImage = await getPageElement(page, '.img-responsive', 1000);
+		if (eleImage) {
+			console.log('Found single image.');
+
+			const imageSource = await page.$eval('.img-responsive', (element) => element.getAttribute('src'));
+			if (!sources.includes(imageSource)) {
+				sources.push(imageSource);
+			}
+		}
+
+		if (sources.length > 0) {
+			break;
 		}
 	}
 
-	let description = '';
-
-	try {
-		description = await page.$eval('.b-post__text-el', (element) => element.innerText);
-	} catch (errors) {
-		description = 'none';
-	}
-
-	const timestamp = await page.$eval('.b-post__date > span', (element) => element.innerText);
+	// set up post
 
 	let post = {
 		id: 0,
 		url: url,
 		sources: sources,
-		description: description,
-		date: timestamp,
-		locked: locked,
 		mediaCount: 0,
 	};
 
-	// console.log(post.sources);
-
+	// get id
+	
 	await dbGetPromise('SELECT id, cache_media_count FROM Post WHERE url = ?', [url]).then((row) => {
 		if (row) {
 			post.id = Number(row.id);
 			post.mediaCount = row.cache_media_count;
 		}
 	});
+
+	// get description
+
+	try {
+		post.description = await page.$eval('.b-post__text-el', (element) => element.innerText);
+	} catch (errors) {
+		post.description = 'none';
+	}
+
+	// get timestamp
+
+	post.date = await page.$eval('.b-post__date > span', (element) => element.innerText);
+
+	// check if locked
+
+	const eleLocked = await getPageElement(page, '.post-purchase');
+	if (eleLocked) {
+		console.log('Post is locked.');
+
+		// b-post__price
+		post.locked = 1;
+	}
+
+	// console.log(post.sources);
+
+	// create new post
 
 	if (post.id === 0) {
 		await dbRunPromise(`INSERT INTO Post (
@@ -277,16 +308,22 @@ async function scrapePost(page, db, author, url) {
 			cache_media_count
 		) VALUES (?, ?, ?, ?, ?, ?)`, [
 			author.id,
-			url,
-			encodeURIComponent(description),
-			timestamp,
-			locked,
+			post.url,
+			encodeURIComponent(post.description),
+			post.date,
+			post.locked,
 			post.mediaCount
 		]);
 
 		await dbGetPromise('SELECT id FROM Post WHERE url = ?', [url]).then((row) => {
 			post.id = Number(row.id);
 		});
+	}
+
+	if (post.sources.length === 0) {
+		console.log('Nothing to download.');
+
+		return;
 	}
 
 	let queue = [];
@@ -304,6 +341,8 @@ async function scrapePost(page, db, author, url) {
 			}
 		});
 	}
+
+	console.log(`Queueing ${queue.length} download(s)...`);
 
 	let index = 0;
 	for (const source of queue) {
@@ -346,9 +385,14 @@ async function scrapeMediaPage(page, db, author) {
 
 	let seenPosts = [];
 
-	await dbAllPromise('SELECT * FROM Post WHERE author_id = ?', author.id).then((rows) => {
-		seenPosts = rows.map(row => row.url);
-	});
+	await dbAllPromise(`SELECT *
+		FROM Post
+		WHERE author_id = ?
+		AND cache_media_count > 0`, author.id)
+		.then((rows) => {
+			seenPosts = rows.map(row => row.url);
+		});
+
 	console.log(seenPosts);
 
 	// wait for page to load
@@ -357,7 +401,11 @@ async function scrapeMediaPage(page, db, author) {
 
 	// scroll down automatically every 3s
 
-	const unseenPosts = await page.evaluate(async (seenPosts) => {
+	const logger = (message) => {
+		console.log(message);
+	};
+
+	const unseenPosts = await page.evaluate(async (logger, seenPosts) => {
 		let unseenPosts = [];
 
 		await new Promise((resolve, _reject) => {
@@ -373,39 +421,35 @@ async function scrapeMediaPage(page, db, author) {
 
 				let foundUnseen = [];
 				found.forEach(id => {
-					if (!seenPosts.includes(id)) {
+					if (!seenPosts.includes(id) && !unseenPosts.includes(id)) {
 						foundUnseen.push(id);
 					}
 				});
 				console.log(foundUnseen);
 
-				console.log(`Found ${foundUnseen.length} posts...`);
+				console.log(`Found ${foundUnseen.length} new posts...`);
+
+				unseenPosts = unseenPosts.concat(foundUnseen);
+				console.log(unseenPosts);
+				console.log(`Total: ${unseenPosts.length}`);
+
+				// check if we've scrolled down the entire page
 
 				if (totalHeight >= scrollHeight) {
 					clearInterval(timer);
 					resolve(unseenPosts);
 				}
-
-				found.forEach(id => {
-					if (!unseenPosts.includes(id)) {
-						unseenPosts.push(id);
-					}
-				})
-				console.log(unseenPosts);
 			}, 3000);
 		});
 
 		return unseenPosts;
-	}, seenPosts);
+	}, logger, seenPosts);
 
 	// get posts
 
-	// const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => Number(post.id.match(/postId_(.+)/i)[1])));
-
-	console.log(unseenPosts);
-
 	if (unseenPosts.length === 0) {
-		console.log('All posts seen.')
+		console.log('All posts seen.');
+
 		return;
 	}
 
