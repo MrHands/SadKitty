@@ -1,7 +1,8 @@
 const fs = require('fs');
 const https = require('https');
 const puppeteer = require('puppeteer');
-const sqlite3 = require('sqlite3').verbose();
+const { Database } = require('sqlite3');
+const util = require('util');
 
 // authentication
 
@@ -11,16 +12,45 @@ const auth = require('./auth.json');
 
 fs.exists('./storage.db', (exists) => {
 	if (!exists) {
-		let db = new sqlite3.Database('./storage.db', (_err) => {
-
+		let db = new Database('./storage.db', (_err) => {
 			db.close();
 		});
 	}
 });
 
-// create or open database
+let db = new Database('./storage.db');
 
-let db = new sqlite3.Database('./storage.db');
+const dbGetPromise = (sql, ...params) => {
+	return new Promise((resolve, reject) => {
+		db.get(sql, ...params, (err, row) => {
+			if (err) {
+				return reject(err);
+			}
+
+			resolve(row);
+		})
+	});
+};
+
+const dbRunPromise = (sql, params) => {
+	return new Promise((resolve, reject) => {
+		db.run(sql, params, (result, err) => {
+			if (err) {
+				return reject(err);
+			}
+
+			resolve(result);
+		})
+	});
+};
+
+const dbSerializePromise = () => {
+	return new Promise((resolve, _reject) => {
+		db.serialize(() => {
+			resolve();
+		});
+	})
+};
 
 db.run(`CREATE TABLE IF NOT EXISTS Author (
 	id TEXT PRIMARY KEY,
@@ -281,27 +311,28 @@ async function scrapePost(page, db, author, url) {
 async function scrapeMediaPage(page, db, author) {
 	// go to media page
 
-	await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_asc`, {
+	/*await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_asc`, {
 		waitUntil: 'networkidle0',
-	});
+	});*/
+
+	//const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => Number(post.id.match(/postId_(.+)/i)[1])));
+
+	const postIds = [ 125160941 ];
 
 	let unseenPosts = [];
 
-	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => post.id.match(/postId_(.+)/i)[1]));
+	for (const id of postIds) {
+		await dbGetPromise(`SELECT * FROM Post WHERE id = ?`, id).then((row) => {
+			console.log(`row: ${row}`);
 
-	db.serialize(() => {
-		for (const id of postIds) {
-			db.get('SELECT * FROM Post WHERE id = ?', [id], (err, row) => {
-				if (dbErrorHandler(err)) {
-					return;
-				}
+			if (!row || (row.locked === 0 && row.cache_media_count === 0)) {
+				unseenPosts.push(id);
+			}
+		});
+	}
 
-				if (!row || (row.locked === 0 && row.cache_media_count === 0)) {
-					unseenPosts.push(id);
-				}
-			},);
-		}
-	});
+	console.log('unseenPosts:');
+	console.log(unseenPosts);
 
 	for (const id of unseenPosts) {
 		await scrapePost(page, db, author, `https://onlyfans.com/${id}/${author.id}`);
@@ -309,7 +340,9 @@ async function scrapeMediaPage(page, db, author) {
 }
 
 async function scrape(authors) {
-	const browser = await puppeteer.launch({
+	const page = null;
+
+	/*const browser = await puppeteer.launch({
 		headless: false,
 	});
 	const page = await browser.newPage();
@@ -340,7 +373,7 @@ async function scrape(authors) {
 
 	await page.waitForSelector('.user_posts', { timeout: 10000 });
 
-	console.log('Logged in.');
+	console.log('Logged in.');*/
 
 	// scrape media pages
 
