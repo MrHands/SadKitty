@@ -75,6 +75,11 @@ db.run(`CREATE TABLE IF NOT EXISTS Media (
 	file_path TEXT
 )`);
 
+function getCleanUrl(source) {
+	const url = new URL(source);
+	return `${url.protocol}//${url.hostname}${url.pathname}`;
+}
+
 const dbErrorHandler = (err) => {
 	if (err) {
 		console.error(err.message);
@@ -187,9 +192,12 @@ async function scrapePost(page, db, author, url) {
 			console.log('Found video.');
 
 			await playVideo.click();
+			await page.waitForSelector('video > source[label="720"]', { timeout: 2000 });
 
-			const videoSource = await page.$eval('video > source[label="720"]');
-			sources.push(videoSource.getAttribute('src'));
+			console.log('Grabbing source.');
+
+			const videoSource = await page.$eval('video > source[label="720"]', (element) => element.getAttribute('src'));
+			sources.push(videoSource);
 		} catch (error) {
 			// images
 
@@ -220,6 +228,7 @@ async function scrapePost(page, db, author, url) {
 	try {
 		description = await page.$eval('.b-post__text-el', (element) => element.innerText);
 	} catch (errors) {
+		description = url;
 	}
 
 	const timestamp = await page.$eval('.b-post__date > span', (element) => element.innerText);
@@ -232,6 +241,8 @@ async function scrapePost(page, db, author, url) {
 		locked: locked,
 		mediaCount: 0,
 	};
+
+	console.log(post.sources);
 
 	await dbGetPromise('SELECT id, cache_media_count FROM Post WHERE url = ?', [url]).then((row) => {
 		if (row) {
@@ -264,23 +275,23 @@ async function scrapePost(page, db, author, url) {
 
 	let queue = [];
 
-	for (const url of post.sources) {
+	for (const source of post.sources) {
 		await dbGetPromise(`SELECT *
 		FROM Media
 		WHERE post_id = ?
 		AND url = ?`, [
 			post.id,
-			url
+			getCleanUrl(source)
 		]).then((row) => {
 			if (!row) {
-				queue.push(url);
+				queue.push(source);
 			}
 		});
 	}
 
 	let index = 0;
-	for (const url of queue) {
-		const filePath = await downloadMedia(url, index, author, post);
+	for (const source of queue) {
+		const filePath = await downloadMedia(source, index, author, post);
 		console.log(filePath);
 
 		post.mediaCount += 1;
@@ -298,7 +309,7 @@ async function scrapePost(page, db, author, url) {
 			file_path
 		) VALUES (?, ?, ?)`, [
 			post.id,
-			url,
+			getCleanUrl(source),
 			filePath
 		]);
 
@@ -319,8 +330,6 @@ async function scrapeMediaPage(page, db, author) {
 
 	for (const id of postIds) {
 		await dbGetPromise(`SELECT * FROM Post WHERE id = ?`, id).then((row) => {
-			console.log(`row: ${row}`);
-
 			if (!row || (row.locked === 0 && row.cache_media_count === 0)) {
 				unseenPosts.push(id);
 			}
