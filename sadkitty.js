@@ -214,12 +214,23 @@ async function scrapePost(page, db, author, url) {
 
 			eleVideo.click();
 
+			let quality;
+
+			for (let q in ['720', 'original', '480', '240']) {
+				try {
+					await page.waitForSelector(`video > source[label="${q}"]`, { timeout: 2000 });
+					quality = q;
+
+					
+				} catch {
+					continue;
+				}
+			}
+
+			console.log(`Grabbing source at "${quality}" quality.`);
+
 			try {
-				await page.waitForSelector('video > source[label="720"]', { timeout: 2000 });
-
-				console.log('Grabbing source.');
-
-				const videoSource = await page.$eval('video > source[label="720"]', (element) => element.getAttribute('src'));
+				const videoSource = await page.$eval(`video > source[label="${quality}"]`, (element) => element.getAttribute('src'));
 				if (!sources.includes(videoSource)) {
 					sources.push(videoSource);
 				}
