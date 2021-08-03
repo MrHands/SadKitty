@@ -125,7 +125,7 @@ async function downloadMedia(url, index, author, post) {
 		// get path
 
 		const encoded = new URL(url);
-		const extension = String(post.id) + '_' + encoded.pathname.split('.').pop();
+		const extension = encoded.pathname.split('.').pop();
 
 		let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\|\. ]/g, '_');
 		fileName = encodeURIComponent(fileName);
@@ -134,15 +134,20 @@ async function downloadMedia(url, index, author, post) {
 			fileName = fileName.substr(0, 80);
 		}
 
+		const postMatch = url.match(/.*\/(\d+).*/g);
+		fileName += ` [${postMatch[1]}]`;
+
 		if (index > 0) {
-			fileName += `_(${index + 1})`;
+			fileName += ` (${index + 1})`;
 		}
 
 		let dstPath = authorPath + '/' + fileName + '.' + extension;
 
+		console.log(dstPath);
+
 		// download file
 
-		console.log(`Downloading to "${dstPath.split('/').pop()}"...`);
+		console.log(`Downloading "${dstPath.split('/').pop()}"...`);
 	
 		let file;
 		try {
@@ -163,7 +168,7 @@ async function downloadMedia(url, index, author, post) {
 }
 
 async function scrapePost(page, db, author, url) {
-	console.log(`Scraping ${url}...`);
+	console.log(`Scraping "${url}"...`);
 
 	await page.goto(url, {
 		waitUntil: 'domcontentloaded',
@@ -240,7 +245,7 @@ async function scrapePost(page, db, author, url) {
 		mediaCount: 0,
 	};
 
-	console.log(post.sources);
+	// console.log(post.sources);
 
 	await dbGetPromise('SELECT id, cache_media_count FROM Post WHERE url = ?', [url]).then((row) => {
 		if (row) {
@@ -290,7 +295,7 @@ async function scrapePost(page, db, author, url) {
 	let index = 0;
 	for (const source of queue) {
 		const filePath = await downloadMedia(source, index, author, post);
-		console.log(filePath);
+		// console.log(filePath);
 
 		post.mediaCount += 1;
 
@@ -316,6 +321,8 @@ async function scrapePost(page, db, author, url) {
 }
 
 async function scrapeMediaPage(page, db, author) {
+	console.log(`Grabbing posts for ${author.name}...`);
+
 	// go to media page
 
 	await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_asc`, {
@@ -329,7 +336,7 @@ async function scrapeMediaPage(page, db, author) {
 	await page.evaluate(async () => {
 		await new Promise((resolve, _reject) => {
 			let totalHeight = 0;
-			let distance = 100;
+			let distance = 720 * 2;
 			let timer = setInterval(() => {
 				let scrollHeight = document.body.scrollHeight;
 				window.scrollBy(0, distance);
@@ -346,6 +353,12 @@ async function scrapeMediaPage(page, db, author) {
 	// get posts
 
 	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => Number(post.id.match(/postId_(.+)/i)[1])));
+	
+	console.log(`Found ${postIds.length} post(s).`);
+
+	// filter
+
+	console.log('Filtering unseen posts...');
 
 	let unseenPosts = [];
 
@@ -357,8 +370,12 @@ async function scrapeMediaPage(page, db, author) {
 		});
 	}
 
-	console.log('unseenPosts:');
-	console.log(unseenPosts);
+	if (unseenPosts.length === 0) {
+		console.log('All posts seen.')
+		return;
+	}
+
+	console.log(`Found ${unseenPosts.length} unseen post(s).`);
 
 	for (const id of unseenPosts) {
 		await scrapePost(page, db, author, `https://onlyfans.com/${id}/${author.id}`);
@@ -407,11 +424,15 @@ async function scrape(authors) {
 
 	for (const i in authors) {
 		const author = authors[i];
-		console.log(author);
+		// console.log(author);
 		await scrapeMediaPage(page, db, author);
 	}
 
+	console.log('Done.');
+
 	db.close();
+
+	process.exit(0);
 }
 
 db.serialize(() => {
