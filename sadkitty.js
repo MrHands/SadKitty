@@ -135,6 +135,8 @@ async function downloadMedia(url, index, author, post) {
 		}
 
 		const postMatch = post.url.match(/.*\/(\d+).*/g);
+		console.log(post.url);
+		console.log(postMatch);
 		fileName += ` [${postMatch[1]}]`;
 
 		if (index > 0) {
@@ -337,7 +339,7 @@ async function scrapeMediaPage(page, db, author) {
 	await page.evaluate(async () => {
 		await new Promise((resolve, _reject) => {
 			let totalHeight = 0;
-			let distance = 768 * 3;
+			let distance = 768 * 2;
 			let timer = setInterval(() => {
 				let scrollHeight = document.body.scrollHeight;
 				window.scrollBy(0, distance);
