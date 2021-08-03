@@ -358,9 +358,7 @@ async function scrapeMediaPage(page, db, author) {
 
 	// scroll down automatically every 3s
 
-	const logger = console.log;
-
-	await page.evaluate(async (logger, seenPosts, unseenPosts) => {
+	await page.evaluate(async (seenPosts, unseenPosts) => {
 		await new Promise((resolve, _reject) => {
 			let totalHeight = 0;
 			let distance = 768 * 2;
@@ -370,7 +368,7 @@ async function scrapeMediaPage(page, db, author) {
 				totalHeight += distance;
 
 				let found = Array.from(document.querySelectorAll('.user_posts .b-post')).map(post => Number(post.id.match(/postId_(.+)/i)[1]));
-				logger(found);
+				console.log(found);
 
 				let foundUnseen = [];
 				found.forEach(id => {
@@ -378,9 +376,9 @@ async function scrapeMediaPage(page, db, author) {
 						foundUnseen.push(id);
 					}
 				});
-				logger(foundUnseen);
+				console.log(foundUnseen);
 
-				logger(`Found ${foundUnseen.length} new posts...`);
+				console.log(`Found ${foundUnseen.length} new posts...`);
 
 				if (foundUnseen.length === 0 || totalHeight >= scrollHeight) {
 					clearInterval(timer);
@@ -390,7 +388,7 @@ async function scrapeMediaPage(page, db, author) {
 				unseenPosts += foundUnseen;
 			}, 3000);
 		});
-	}, logger, seenPosts, unseenPosts);
+	}, seenPosts, unseenPosts);
 
 	// get posts
 
