@@ -33,7 +33,16 @@ db.run(`CREATE TABLE IF NOT EXISTS Post (
 	author_id TEXT NOT NULL,
 	url TEXT NOT NULL,
 	description TEXT,
-	timestamp TEXT
+	timestamp TEXT,
+	locked INTEGER,
+	cache_media_count INTEGER
+)`);
+
+db.run(`CREATE TABLE IF NOT EXISTS Media (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	post_id INTEGER NOT NULL,
+	url TEXT NOT NULL,
+	file_path TEXT
 )`);
 
 // load authors
@@ -88,7 +97,7 @@ async function downloadMedia(url, index, author, post) {
 	});
 }
 
-async function scrapePost(page, author, url) {
+async function scrapePost(page, db, author, url) {
 	console.log(`Scraping ${url}...`);
 
 	await page.goto(url, {
@@ -99,7 +108,7 @@ async function scrapePost(page, author, url) {
 
 	let sources = [];
 
-	let locked = false;
+	let locked = 0;
 
 	try {
 		// check if locked
@@ -107,7 +116,7 @@ async function scrapePost(page, author, url) {
 		const eleLocked = await page.waitForSelector('.post-purchase', { timeout: 100 });
 		if (eleLocked) {
 			console.log('Post is locked.');
-			locked = true;
+			locked = 1;
 		}
 	} catch (error) {
 		try {
@@ -153,18 +162,89 @@ async function scrapePost(page, author, url) {
 	} catch (errors) {
 	}
 
-	const date = await page.$eval('.b-post__date > span', (element) => element.innerText);
+	const timestamp = await page.$eval('.b-post__date > span', (element) => element.innerText);
 
 	const post = {
+		id: 0,
 		sources: sources,
 		description: description,
-		date: date,
-		locked: locked
+		date: timestamp,
+		locked: locked,
+		mediaCount: 0,
 	};
 
-	let index = 0;
+	db.serialize(() => {
+		db.get('SELECT id, cache_media_count FROM Post WHERE url = ?', [url], (_err, row) => {
+			console.log(row);
+			if (row) {
+				post.id = row.id;
+				post.mediaCount = row.cache_media_count;
+			}
+		});
+
+		if (post.id === 0) {
+			db.run(`INSERT INTO Post (
+				author_id,
+				url,
+				description,
+				timestamp,
+				locked,
+				cache_media_count
+			) VALUES (?, ?, ?, ?, ?, ?)`, [
+				author.id,
+				url,
+				encodeURIComponent(description),
+				timestamp,
+				locked,
+				post.mediaCount
+			]);
+		}
+	});
+
+	let queue = [];
+
 	for (const url of post.sources) {
-		await downloadMedia(url, index, author, post);
+		db.serialize(() => {
+			db.run(`SELECT *
+			FROM Media
+			WHERE post_id = ?
+			AND url = ?`, [
+				post.id,
+				url
+			], (_err, row) => {
+				if (!row) {
+					queue.push(url);
+				}
+			});
+		});
+	}
+
+	let index = 0;
+	for (const url of queue) {
+		const filePath = await downloadMedia(url, index, author, post);
+		console.log(filePath);
+
+		post.mediaCount += 1;
+
+		db.serialize(() => {
+			db.run(`UPDATE Post
+			SET cache_media_count = ?
+			WHERE id = ?`, [
+				post.mediaCount,
+				post.id
+			]);
+
+			db.run(`INSERT INTO Media (
+				post_id,
+				url,
+				file_path
+			) VALUES (?, ?, ?)`, [
+				post.id,
+				url,
+				filePath
+			]);
+		});
+
 		index += 1;
 	}
 }
@@ -179,16 +259,19 @@ async function scrapeMediaPage(page, db, author) {
 	let unseenPosts = [];
 
 	const postIds = await page.$$eval('.user_posts .b-post', elements => elements.map(post => post.id.match(/postId_(.+)/i)[1]));
-	for (const id of postIds) {
-		db.get('SELECT * FROM Post WHERE id = ?', [id], (_err, row) => {
-			if (!row) {
-				unseenPosts.push(id);
-			}
-		});
-	}
+
+	db.serialize(() => {
+		for (const id of postIds) {
+			db.get('SELECT * FROM Post WHERE id = ?', [id], (_err, row) => {
+				if (!row || (row.locked === 0 && row.cache_media_count === 0)) {
+					unseenPosts.push(id);
+				}
+			});
+		}
+	});
 
 	for (const id of unseenPosts) {
-		await scrapePost(page, author, `https://onlyfans.com/${id}/${author.id}`);
+		await scrapePost(page, db, author, `https://onlyfans.com/${id}/${author.id}`);
 	}
 }
 
