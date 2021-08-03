@@ -363,33 +363,45 @@ async function scrapePost(page, db, author, url) {
 		});
 	}
 
-	console.log(`Queueing ${queue.length} download(s)...`);
+	if (queue.length > 0) {
+		console.log(`Queueing ${queue.length} download(s)...`);
 
-	let index = 0;
-	for (const source of queue) {
-		const filePath = await downloadMedia(source, index, author, post);
-		// console.log(filePath);
+		let index = 0;
+		for (const source of queue) {
+			const filePath = await downloadMedia(source, index, author, post);
 
-		post.mediaCount += 1;
+			// update media count
+	
+			post.mediaCount += 1;
+	
+			await dbRunPromise(`UPDATE Post
+			SET cache_media_count = ?
+			WHERE id = ?`, [
+				post.mediaCount,
+				post.id
+			]);
 
+			// add media to database
+	
+			await dbRunPromise(`INSERT INTO Media (
+				post_id,
+				url,
+				file_path
+			) VALUES (?, ?, ?)`, [
+				post.id,
+				getCleanUrl(source),
+				filePath
+			]);
+	
+			index += 1;
+		}
+	} else {
 		await dbRunPromise(`UPDATE Post
 		SET cache_media_count = ?
 		WHERE id = ?`, [
-			post.mediaCount,
+			post.sources.length,
 			post.id
 		]);
-
-		await dbRunPromise(`INSERT INTO Media (
-			post_id,
-			url,
-			file_path
-		) VALUES (?, ?, ?)`, [
-			post.id,
-			getCleanUrl(source),
-			filePath
-		]);
-
-		index += 1;
 	}
 }
 
