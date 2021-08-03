@@ -214,14 +214,12 @@ async function scrapePost(page, db, author, url) {
 
 			eleVideo.click();
 
-			let quality;
-
-			for (let q in ['720', 'original', '480', '240']) {
+			let quality = '720';
+			const qualityLevels = ['720', 'original', '480', '240'];
+			for (let q in qualityLevels) {
 				try {
-					await page.waitForSelector(`video > source[label="${q}"]`, { timeout: 2000 });
-					quality = q;
-
-					
+					await page.waitForSelector(`video > source[label="${qualityLevels[q]}"]`, { timeout: 2000 });
+					quality = qualityLevels[q];
 				} catch {
 					continue;
 				}
@@ -432,14 +430,15 @@ async function scrapeMediaPage(page, db, author) {
 
 		await new Promise((resolve, _reject) => {
 			let totalHeight = 0;
-			let distance = 768 * 2 + 1;
 			let prevScrollHeight = 0;
+
 			let timer = setInterval(() => {
-				let scrollHeight = document.body.scrollHeight;
+				let distance = document.body.scrollHeight - window.innerHeight - window.scrollY;
 				window.scrollBy(0, distance);
 				totalHeight += distance;
 
-				if (prevScrollHeight !== scrollHeight) {
+				let scrollHeight = document.body.scrollHeight;
+				if (scrollHeight > prevScrollHeight) {
 					console.log(`prevScrollHeight ${prevScrollHeight} scrollHeight ${scrollHeight}`);
 					prevScrollHeight = scrollHeight;
 
