@@ -4,6 +4,13 @@ const puppeteer = require('puppeteer');
 const { Database } = require('sqlite3');
 const util = require('util');
 
+// logging
+
+function logger(message) {
+	const now = new Date(Date.now());
+	console.log(`[${('0' + now.getHours()).slice(-2)}:${('0' + now.getMinutes()).slice(-2)}:${('0' + now.getSeconds()).slice(-2)}]`, message);
+}
+
 // authentication
 
 const auth = require('./auth.json');
@@ -164,11 +171,11 @@ async function downloadMedia(url, index, author, post) {
 
 		let dstPath = authorPath + '/' + fileName + '.' + extension;
 
-		console.log(dstPath);
+		logger(dstPath);
 
 		// download file
 
-		console.log(`Downloading "${dstPath.split('/').pop()}"...`);
+		logger(`Downloading "${dstPath.split('/').pop()}"...`);
 	
 		let file;
 		try {
@@ -182,14 +189,14 @@ async function downloadMedia(url, index, author, post) {
 			resolve(dstPath);
 		}).on('error', (err) => {
 			fs.unlink(dstPath);
-			console.log(`Failed to download: ${err.message}`);
+			logger(`Failed to download: ${err.message}`);
 			return reject(err);
 		});
 	});
 }
 
 async function scrapePost(page, db, author, url) {
-	console.log(`Scraping "${url}"...`);
+	logger(`Scraping "${url}"...`);
 
 	await page.goto(url, {
 		waitUntil: 'domcontentloaded',
@@ -201,7 +208,7 @@ async function scrapePost(page, db, author, url) {
 		try {
 			await page.waitForSelector('.b-post__wrapper', { timeout: 10000 });
 		} catch (errors) {
-			console.log(`Reloading page, attempt ${i + 1}...`);
+			logger(`Reloading page, attempt ${i + 1}...`);
 			await page.reload();
 		}
 	}
@@ -210,14 +217,14 @@ async function scrapePost(page, db, author, url) {
 
 	for (let i = 0; i < 4; ++i) {
 		if (i > 0) {
-			console.log(`Attempt to scrape ${i + 1}...`);
+			logger(`Attempt to scrape ${i + 1}...`);
 		}
 
 		// get video
 
 		const eleVideo = await getPageElement(page, '.video-js button', 1000);
 		if (eleVideo) {
-			console.log('Found video.');
+			logger('Found video.');
 
 			eleVideo.click();
 
@@ -233,7 +240,7 @@ async function scrapePost(page, db, author, url) {
 				}
 			}
 
-			console.log(`Grabbing source at "${quality}" quality.`);
+			logger(`Grabbing source at "${quality}" quality.`);
 
 			try {
 				const videoSource = await page.$eval(`video > source[label="${quality}"]`, (element) => element.getAttribute('src'));
@@ -241,7 +248,7 @@ async function scrapePost(page, db, author, url) {
 					sources.push(videoSource);
 				}
 			} catch (error) {
-				console.log('Failed to grab source: ' + error.message);
+				logger('Failed to grab source: ' + error.message);
 			}
 		}
 
@@ -249,7 +256,7 @@ async function scrapePost(page, db, author, url) {
 
 		const eleSwiper = await getPageElement(page, '.swiper-wrapper', 1000);
 		if (eleSwiper) {
-			console.log('Found multiple images.');
+			logger('Found multiple images.');
 
 			try {
 				const found = await page.$$eval('img[draggable="false"]', elements => elements.map(image => image.getAttribute('src')));
@@ -259,13 +266,13 @@ async function scrapePost(page, db, author, url) {
 					}
 				});
 			} catch (error) {
-				console.log('Failed to grab source: ' + error.message);
+				logger('Failed to grab source: ' + error.message);
 			}
 		}
 
 		const eleImage = await getPageElement(page, '.img-responsive', 1000);
 		if (eleImage) {
-			console.log('Found single image.');
+			logger('Found single image.');
 
 			try {
 				const imageSource = await page.$eval('.img-responsive', (element) => element.getAttribute('src'));
@@ -273,7 +280,7 @@ async function scrapePost(page, db, author, url) {
 					sources.push(imageSource);
 				}
 			} catch (error) {
-				console.log('Failed to grab source: ' + error.message);
+				logger('Failed to grab source: ' + error.message);
 			}
 		}
 
@@ -316,13 +323,11 @@ async function scrapePost(page, db, author, url) {
 
 	const eleLocked = await getPageElement(page, '.post-purchase');
 	if (eleLocked) {
-		console.log('Post is locked.');
+		logger('Post is locked.');
 
 		// b-post__price
 		post.locked = 1;
 	}
-
-	// console.log(post.sources);
 
 	// create new post
 
@@ -349,7 +354,7 @@ async function scrapePost(page, db, author, url) {
 	}
 
 	if (post.sources.length === 0) {
-		console.log('Nothing to download.');
+		logger('Nothing to download.');
 
 		return;
 	}
@@ -371,7 +376,7 @@ async function scrapePost(page, db, author, url) {
 	}
 
 	if (queue.length > 0) {
-		console.log(`Queueing ${queue.length} download(s)...`);
+		logger(`Queueing ${queue.length} download(s)...`);
 
 		let index = 0;
 		for (const source of queue) {
@@ -413,7 +418,7 @@ async function scrapePost(page, db, author, url) {
 }
 
 async function scrapeMediaPage(page, db, author) {
-	console.log(`Grabbing posts for ${author.name}...`);
+	logger(`Grabbing posts for ${author.name}...`);
 
 	// go to media page
 
@@ -433,7 +438,7 @@ async function scrapeMediaPage(page, db, author) {
 			seenPosts = rows.map(row => Number(row.url.match(/.*\/(\d+).*/)[1]));
 		});
 
-	console.log(seenPosts);
+		logger(seenPosts);
 
 	// wait for page to load
 
@@ -441,11 +446,7 @@ async function scrapeMediaPage(page, db, author) {
 
 	// scroll down automatically every 3s
 
-	const logger = (message) => {
-		console.log(message);
-	};
-
-	const unseenPosts = await page.evaluate(async (logger, seenPosts) => {
+	const unseenPosts = await page.evaluate(async (seenPosts) => {
 		let unseenPosts = [];
 
 		await new Promise((resolve, _reject) => {
@@ -493,12 +494,12 @@ async function scrapeMediaPage(page, db, author) {
 		});
 
 		return unseenPosts;
-	}, logger, seenPosts);
+	}, seenPosts);
 
 	// get posts
 
 	if (unseenPosts.length === 0) {
-		console.log('All posts seen.');
+		logger('All posts seen.');
 
 		return;
 	}
@@ -507,11 +508,13 @@ async function scrapeMediaPage(page, db, author) {
 
 	unseenPosts.reverse();
 
-	console.log(`Found ${unseenPosts.length} unseen post(s).`);
+	logger(`Scraping ${unseenPosts.length} unseen post(s).`);
 
 	for (const id of unseenPosts) {
 		await scrapePost(page, db, author, `https://onlyfans.com/${id}/${author.id}`);
 	}
+
+	logger(`Continuing...`);
 }
 
 async function scrape() {
@@ -524,7 +527,7 @@ async function scrape() {
 		});
 	}
 
-	console.log(authors);
+	logger(authors);
 
 	// open browser
 
@@ -538,7 +541,7 @@ async function scrape() {
 		height: 768
 	});
 
-	console.log('Loading main page...');
+	logger('Loading main page...');
 
 	await page.goto('https://onlyfans.com', {
 		waitUntil: 'domcontentloaded',
@@ -547,35 +550,34 @@ async function scrape() {
 
 	// log in using twitter
 
-	console.log('Logging in...');
+	logger('Logging in...');
 
 	await page.type('input[name="email"]', auth.username, { delay: 10 });
 	await page.type('input[name="password"]', auth.password, { delay: 10 });
 	await page.click('button[type="submit"]');
 
-	console.log('Waiting for reCAPTCHA...');
+	logger('Waiting for reCAPTCHA...');
 
 	try {
 		await page.waitForSelector('.user_posts', { timeout: 4 * 60 * 1000 });
 	} catch {
-		console.log('Timed out.');
+		logger('Timed out.');
 
 		process.exit(0);
 	}
 
 	await page.waitForSelector('.user_posts', { timeout: 10000 });
 
-	console.log('Logged in.');
+	logger('Logged in.');
 
 	// scrape media pages
 
 	for (const i in authors) {
 		const author = authors[i];
-		// console.log(author);
 		await scrapeMediaPage(page, db, author);
 	}
 
-	console.log('Done.');
+	logger('Done.');
 
 	db.close();
 
