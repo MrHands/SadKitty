@@ -162,8 +162,8 @@ async function downloadMedia(url, index, author, post) {
 	});
 }
 
-async function scrapePost(page, db, author, url) {
-	logger(`Loading "${url}"...`);
+async function scrapePost(page, url, author, postIndex, postTotal) {
+	logger(`(${postIndex} / ${postTotal}) Scraping sources from "${url}"...`);
 
 	// load page and wait for post to appear
 
@@ -196,8 +196,6 @@ async function scrapePost(page, db, author, url) {
 
 		return 0;
 	}
-
-	logger(`Scraping sources from "${url}"...`);
 
 	let sources = [];
 
@@ -529,9 +527,9 @@ async function scrapeMediaPage(page, db, author) {
 
 	scrapingFailed = [];
 
-	for (const id of unseenPosts) {
+	for (const [index, id] of unseenPosts.entries()) {
 		const url = `https://onlyfans.com/${id}/${author.id}`;
-		const scraped = await scrapePost(page, db, author, url);
+		const scraped = await scrapePost(page, url, author, index, unseenPosts.length);
 		if (scraped < 1) {
 			scrapingFailed.push(url);
 		}
