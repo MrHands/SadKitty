@@ -163,7 +163,7 @@ async function downloadMedia(url, index, author, post) {
 }
 
 async function scrapePost(page, url, author, postIndex, postTotal) {
-	logger(`(${postIndex} / ${postTotal}) Scraping sources from "${url}"...`);
+	logger(`(${postIndex + 1} / ${postTotal}) Scraping sources from "${url}"...`);
 
 	// load page and wait for post to appear
 
