@@ -434,6 +434,8 @@ async function scrapeMediaPage(page, db, author) {
 			await page.waitForSelector('.user_posts', {
 				timeout: 10 * 1000
 			});
+
+			break;
 		} catch (errors) {
 			logger('Failed to load page: ' + errors.message);
 
@@ -600,15 +602,24 @@ async function scrape() {
 
 	logger('Waiting for reCAPTCHA...');
 
-	try {
-		await page.waitForSelector('.user_posts', { timeout: 4 * 60 * 1000 });
-	} catch {
-		logger('Timed out.');
+	let attempt = 1;
+	for (attempt = 1; attempt < 6; attempt++) {
+		try {
+			await page.waitForSelector('.user_posts', { timeout: 60 * 1000 });
 
-		process.exit(0);
+			break;
+		} catch {
+			if (attempt > 1) {
+				logger(`Checking for reCAPTCHA again in 1 minute...`);
+			}
+		}
 	}
 
-	await page.waitForSelector('.user_posts', { timeout: 10000 });
+	if (attempt >= 5) {
+		logger('Timed out on reCAPTCHA.');
+	
+		process.exit(0);
+	}
 
 	logger('Logged in.');
 
