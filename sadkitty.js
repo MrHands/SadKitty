@@ -623,7 +623,7 @@ async function scrape() {
 
 	// scrape media pages
 
-	print(`Visiting ${authors.length} author(s).`);
+	logger(`Visiting ${authors.length} author(s).`);
 
 	for (const i in authors) {
 		const author = authors[i];
