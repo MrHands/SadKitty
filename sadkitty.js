@@ -188,7 +188,6 @@ async function scrapePost(page, db, author, url) {
 			logger('Failed to load page: ' + errors.message);
 
 			attempt += 1;
-
 			await page.reload();
 		}
 	} while (attempt < 4);
@@ -549,9 +548,18 @@ async function scrape() {
 
 	// open browser
 
-	const browser = await puppeteer.launch({
+	let browser = await puppeteer.launch({
 		headless: false,
 	});
+	browser.on('disconnected', async () => {
+		logger('Connection lost.');
+
+		await browser.close();
+		browser.process()?.kill('SIGINT');
+
+		process.exit(0);
+	});
+
 	const page = await browser.newPage();
 	await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0');
 	await page.setViewport({
