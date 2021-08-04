@@ -139,8 +139,6 @@ async function downloadMedia(url, index, author, post) {
 
 		let dstPath = authorPath + '/' + fileName + '.' + extension;
 
-		logger(dstPath);
-
 		// download file
 
 		logger(`Downloading "${dstPath.split('/').pop()}"...`);
@@ -154,6 +152,7 @@ async function downloadMedia(url, index, author, post) {
 	
 		https.get(url, (response) => {
 			response.pipe(file);
+			logger(`Succeeded.`);
 			resolve(dstPath);
 		}).on('error', (err) => {
 			fs.unlink(dstPath);
@@ -197,7 +196,7 @@ async function scrapePost(page, db, author, url) {
 	if (attempt == 4) {
 		logger(`Failed to load "${url}", continuing.`);
 
-		return;
+		return 0;
 	}
 
 	logger(`Scraping sources from "${url}"...`);
@@ -353,7 +352,7 @@ async function scrapePost(page, db, author, url) {
 	if (post.sources.length === 0) {
 		logger('Nothing to download.');
 
-		return;
+		return 1;
 	}
 
 	let queue = [];
@@ -405,13 +404,17 @@ async function scrapePost(page, db, author, url) {
 			index += 1;
 		}
 	} else {
+		post.mediaCount = post.sources.length;
+
 		await dbRunPromise(`UPDATE Post
 		SET cache_media_count = ?
 		WHERE id = ?`, [
-			post.sources.length,
+			post.mediaCount,
 			post.id
 		]);
 	}
+
+	return post.mediaCount;
 }
 
 async function scrapeMediaPage(page, db, author) {
@@ -507,8 +510,19 @@ async function scrapeMediaPage(page, db, author) {
 
 	logger(`Scraping ${unseenPosts.length} unseen post(s).`);
 
+	scrapingFailed = [];
+
 	for (const id of unseenPosts) {
-		await scrapePost(page, db, author, `https://onlyfans.com/${id}/${author.id}`);
+		const url = `https://onlyfans.com/${id}/${author.id}`;
+		const scraped = await scrapePost(page, db, author, url);
+		if (scraped < 1) {
+			scrapingFailed.push(url);
+		}
+	}
+
+	if (scrapingFailed.length > 0) {
+		logger(`Failed to scrape ${scrapingFailed.length} post(s):`);
+		logger(scrapingFailed);
 	}
 
 	logger(`Continuing...`);
