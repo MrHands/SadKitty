@@ -63,13 +63,12 @@ const dbAllPromise = (sql, params) => {
 	});
 };
 
-const dbSerializePromise = () => {
-	return new Promise((resolve, _reject) => {
-		db.serialize(() => {
-			resolve();
-		});
-	})
-};
+function getCleanUrl(source) {
+	const url = new URL(source);
+	return `${url.protocol}//${url.hostname}${url.pathname}`;
+}
+
+// schema
 
 db.run(`CREATE TABLE IF NOT EXISTS Author (
 	id TEXT PRIMARY KEY,
@@ -94,40 +93,9 @@ db.run(`CREATE TABLE IF NOT EXISTS Media (
 	file_path TEXT
 )`);
 
-function getCleanUrl(source) {
-	const url = new URL(source);
-	return `${url.protocol}//${url.hostname}${url.pathname}`;
-}
-
-const dbErrorHandler = (err) => {
-	if (err) {
-		console.error(err.message);
-	}
-
-	return !!err;
-}
-
-const dbRunHandler = (_result, err) => {
-	return dbErrorHandler(err);
-}
-
 // load authors
 
 const authorData = require('./authors.json');
-
-db.serialize(() => {
-	authorData.forEach(author => {
-		db.run(`INSERT OR IGNORE INTO Author (
-			id,
-			name,
-			url
-		) VALUES (?, ?, ?)`, [
-			author.id,
-			author.name,
-			`https://onlyfans.com/${author.id}`
-		], dbRunHandler);
-	});
-});
 
 // scraping
 
@@ -199,7 +167,7 @@ async function scrapePost(page, db, author, url) {
 	logger(`Scraping "${url}"...`);
 
 	await page.goto(url, {
-		waitUntil: 'domcontentloaded',
+		waitUntil: 'domcontentloaded'
 	});
 
 	// wait for post to load
@@ -521,7 +489,14 @@ async function scrape() {
 	// get authors
 
 	let authors = [];
+
 	for (const data of authorData) {
+		await dbRunPromise(`INSERT OR IGNORE INTO Author (id, name, url) VALUES (?, ?, ?)`, [
+			author.id,
+			author.name,
+			`https://onlyfans.com/${author.id}`
+		]);
+
 		await dbGetPromise('SELECT * FROM Author WHERE id = ?', data.id).then((author) => {
 			authors.push(author);
 		});
