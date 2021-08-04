@@ -164,28 +164,49 @@ async function downloadMedia(url, index, author, post) {
 }
 
 async function scrapePost(page, db, author, url) {
-	logger(`Scraping "${url}"...`);
+	logger(`Loading "${url}"...`);
 
-	await page.goto(url, {
-		waitUntil: 'domcontentloaded'
-	});
+	// load page and wait for post to appear
 
-	// wait for post to load
+	let attempt = 1;
+	do {
+		if (attempt > 1) {
+			logger(`Attempt ${attempt + 1} to scrape page...`);
+		}
 
-	for (let i = 1; i < 3; ++i) {
 		try {
-			await page.waitForSelector('.b-post__wrapper', { timeout: 10000 });
+			await page.goto(url, {
+				waitUntil: 'domcontentloaded',
+				timeout: 10 * 1000
+			});
+
+			await page.waitForSelector('.b-post__wrapper', {
+				timeout: 10 * 1000
+			});
+
+			break;
 		} catch (errors) {
-			logger(`Reloading page, attempt ${i + 1}...`);
+			logger('Failed to load page: ' + errors.message);
+
+			attempt += 1;
+
 			await page.reload();
 		}
+	} while (attempt < 4);
+
+	if (attempt == 4) {
+		logger(`Failed to load "${url}", continuing.`);
+
+		return;
 	}
+
+	logger(`Scraping sources from "${url}"...`);
 
 	let sources = [];
 
-	for (let i = 0; i < 4; ++i) {
-		if (i > 0) {
-			logger(`Attempt to scrape ${i + 1}...`);
+	for (attempt = 1; attempt < 4; ++attempt) {
+		if (attempt > 1) {
+			logger(`Attempt ${attempt} to scrape sources...`);
 		}
 
 		// get video
@@ -194,7 +215,12 @@ async function scrapePost(page, db, author, url) {
 		if (eleVideo) {
 			logger('Found video.');
 
-			eleVideo.click();
+			try {
+				eleVideo.click();
+			} catch {
+				logger('Failed to click play button.');
+				continue;
+			}
 
 			let quality = '720';
 			const qualityLevels = ['720', 'original', '480', '240'];
@@ -217,6 +243,7 @@ async function scrapePost(page, db, author, url) {
 				}
 			} catch (error) {
 				logger('Failed to grab source: ' + error.message);
+				continue;
 			}
 		}
 
@@ -235,6 +262,7 @@ async function scrapePost(page, db, author, url) {
 				});
 			} catch (error) {
 				logger('Failed to grab source: ' + error.message);
+				continue;
 			}
 		}
 
@@ -249,6 +277,7 @@ async function scrapePost(page, db, author, url) {
 				}
 			} catch (error) {
 				logger('Failed to grab source: ' + error.message);
+				continue;
 			}
 		}
 
