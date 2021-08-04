@@ -416,7 +416,7 @@ async function scrapePost(page, db, author, url) {
 }
 
 async function scrapeMediaPage(page, db, author) {
-	logger(`Grabbing posts for ${author.name}...`);
+	logger(`${author.name}: Grabbing posts...`);
 
 	// wait for page to load
 
@@ -525,7 +525,7 @@ async function scrapeMediaPage(page, db, author) {
 
 	unseenPosts.reverse();
 
-	logger(`Scraping ${unseenPosts.length} unseen post(s).`);
+	logger(`Found ${unseenPosts.length} post(s).`);
 
 	scrapingFailed = [];
 
@@ -537,10 +537,10 @@ async function scrapeMediaPage(page, db, author) {
 		}
 	}
 
-	logger(`Scraped ${unseenPosts.length} post(s) from ${author.name}.`);
+	logger(`${author.name}: Scraped ${unseenPosts.length} post(s).`);
 
 	if (scrapingFailed.length > 0) {
-		logger(`Failed to scrape ${scrapingFailed.length} post(s):`);
+		logger(`Failed to scrape:`);
 		logger(scrapingFailed);
 	}
 }
