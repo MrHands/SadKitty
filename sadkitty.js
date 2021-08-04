@@ -492,9 +492,9 @@ async function scrape() {
 
 	for (const data of authorData) {
 		await dbRunPromise(`INSERT OR IGNORE INTO Author (id, name, url) VALUES (?, ?, ?)`, [
-			author.id,
-			author.name,
-			`https://onlyfans.com/${author.id}`
+			data.id,
+			data.name,
+			`https://onlyfans.com/${data.id}`
 		]);
 
 		await dbGetPromise('SELECT * FROM Author WHERE id = ?', data.id).then((author) => {
