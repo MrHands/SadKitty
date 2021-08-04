@@ -562,7 +562,7 @@ async function scrape() {
 		});
 	}
 
-	logger(authors);
+	// logger(authors);
 
 	// open browser
 
@@ -624,6 +624,8 @@ async function scrape() {
 	logger('Logged in.');
 
 	// scrape media pages
+
+	print(`Visiting ${authors.length} author(s).`);
 
 	for (const i in authors) {
 		const author = authors[i];
