@@ -1,4 +1,5 @@
 downloads/
 node_modules/
 auth.json
+authors.json
 storage.db
