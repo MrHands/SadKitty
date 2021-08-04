@@ -168,7 +168,7 @@ async function scrapePost(page, db, author, url) {
 	// load page and wait for post to appear
 
 	let attempt = 1;
-	do {
+	for (attempt = 1; attempt < 4; ++attempt) {
 		if (attempt > 1) {
 			logger(`Attempt ${attempt + 1} to scrape page...`);
 		}
@@ -187,12 +187,11 @@ async function scrapePost(page, db, author, url) {
 		} catch (errors) {
 			logger('Failed to load page: ' + errors.message);
 
-			attempt += 1;
 			await page.reload();
 		}
-	} while (attempt < 4);
+	};
 
-	if (attempt == 4) {
+	if (attempt >= 3) {
 		logger(`Failed to load "${url}", continuing.`);
 
 		return 0;
@@ -419,11 +418,34 @@ async function scrapePost(page, db, author, url) {
 async function scrapeMediaPage(page, db, author) {
 	logger(`Grabbing posts for ${author.name}...`);
 
-	// go to media page
+	// wait for page to load
 
-	await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_desc`, {
-		waitUntil: 'networkidle0',
-	});
+	let attempt = 1;
+	for (attempt = 1; attempt < 4; ++attempt) {
+		if (attempt > 1) {
+			logger(`Attempt ${attempt} to load media page...`);
+		}
+
+		try {
+			await page.goto(`https://onlyfans.com/${author.id}/media?order=publish_date_desc`, {
+				waitUntil: 'networkidle0',
+				timeout: 10 * 1000
+			});
+			await page.waitForSelector('.user_posts', {
+				timeout: 10 * 1000
+			});
+		} catch (errors) {
+			logger('Failed to load page: ' + errors.message);
+
+			await page.reload();
+		}
+	}
+
+	if (attempt >= 3) {
+		logger('Failed to scrape media page.');
+
+		return;
+	}
 
 	// get all seen posts
 
@@ -436,12 +458,6 @@ async function scrapeMediaPage(page, db, author) {
 		.then((rows) => {
 			seenPosts = rows.map(row => Number(row.url.match(/.*\/(\d+).*/)[1]));
 		});
-
-		logger(seenPosts);
-
-	// wait for page to load
-
-	await page.waitForSelector('.user_posts');
 
 	// scroll down automatically every 3s
 
@@ -519,12 +535,12 @@ async function scrapeMediaPage(page, db, author) {
 		}
 	}
 
+	logger(`Scraped ${unseenPosts.length} post(s) from ${author.name}.`);
+
 	if (scrapingFailed.length > 0) {
 		logger(`Failed to scrape ${scrapingFailed.length} post(s):`);
 		logger(scrapingFailed);
 	}
-
-	logger(`Continuing...`);
 }
 
 async function scrape() {
