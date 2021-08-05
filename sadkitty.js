@@ -571,7 +571,10 @@ async function scrape() {
 		logger('Connection lost.');
 
 		await browser.close();
-		browser.process()?.kill('SIGINT');
+		
+		if (browser.process()) {
+			browser.process().kill('SIGINT');
+		}
 
 		process.exit(0);
 	});
