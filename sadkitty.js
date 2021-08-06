@@ -1,8 +1,7 @@
 const fs = require('fs');
-const https = require('https');
 const puppeteer = require('puppeteer');
 const { Database } = require('sqlite3');
-const util = require('util');
+const Downloader = require('nodejs-file-downloader');
 
 // logging
 
@@ -109,57 +108,73 @@ async function getPageElement(page, selector, timeout = 100) {
 }
 
 async function downloadMedia(url, index, author, post) {
-	return new Promise((resolve, reject) => {
-		// create directories
+	// create directories
 
-		const authorPath = `./downloads/${author.id}`;
+	const authorPath = `./downloads/${author.id}`;
 
-		if (!fs.existsSync(authorPath)) {
-			fs.mkdirSync(authorPath, { recursive: true });
+	if (!fs.existsSync(authorPath)) {
+		fs.mkdirSync(authorPath, { recursive: true });
+	}
+
+	// get path
+
+	const encoded = new URL(url);
+	const extension = encoded.pathname.split('.').pop();
+
+	let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\|\. ]/g, '_');
+	fileName = encodeURIComponent(fileName);
+
+	if (fileName.length > 80) {
+		fileName = fileName.substr(0, 80);
+	}
+
+	const postMatch = post.url.match(/.*\/(\d+).*/);
+	fileName += ` [${postMatch[1]}]`;
+
+	if (index > 0) {
+		fileName += ` (${index + 1})`;
+	}
+
+	let dstPath = authorPath + '/' + fileName + '.' + extension;
+
+	// download file
+
+	logger(`Downloading "${dstPath.split('/').pop()}"...`);
+
+	let timeStart = Date.now();
+
+	const downloader = new Downloader({
+		url: url,
+		directory: authorPath,
+		fileName: fileName + '.' + extension,
+		maxAttempts: 3,
+		cloneFiles: true, // don't overwrite existing files
+		shouldStop: (error) => {
+			console.log(error);
+			return false;
+		},
+		onProgress: (percentage, _chunk, _remainingSize) => {
+			if (Date.now() - timeStart < 10 * 1000) {
+				return;
+			}
+
+			timeStart = Date.now();
+
+			const barBefore = Math.floor(percentage / 10);
+			const barAfter = 10 - barBefore;
+
+			console.log(`[ ${'#'.repeat(barBefore)}${'.'.repeat(barAfter)} ] ${percentage}%`);
 		}
-
-		// get path
-
-		const encoded = new URL(url);
-		const extension = encoded.pathname.split('.').pop();
-
-		let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\|\. ]/g, '_');
-		fileName = encodeURIComponent(fileName);
-
-		if (fileName.length > 80) {
-			fileName = fileName.substr(0, 80);
-		}
-
-		const postMatch = post.url.match(/.*\/(\d+).*/);
-		fileName += ` [${postMatch[1]}]`;
-
-		if (index > 0) {
-			fileName += ` (${index + 1})`;
-		}
-
-		let dstPath = authorPath + '/' + fileName + '.' + extension;
-
-		// download file
-
-		logger(`Downloading "${dstPath.split('/').pop()}"...`);
-	
-		let file;
-		try {
-			file = fs.createWriteStream(dstPath);
-		} catch (error) {
-			return reject(error);
-		}
-	
-		https.get(url, (response) => {
-			response.pipe(file);
-			logger(`Succeeded.`);
-			resolve(dstPath);
-		}).on('error', (err) => {
-			fs.unlink(dstPath);
-			logger(`Failed to download: ${err.message}`);
-			return reject(err);
-		});
 	});
+
+	try {
+		await downloader.download();
+		logger(`Succeeded.`);
+		return dstPath;
+	} catch (error) {
+		logger(`Failed to download: ${error.message}`);
+		return '';
+	}
 }
 
 async function scrapePost(page, url, author, postIndex, postTotal) {
@@ -373,6 +388,9 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 		let index = 0;
 		for (const source of queue) {
 			const filePath = await downloadMedia(source, index, author, post);
+			if (filePath === '') {
+				continue;
+			}
 
 			// update media count
 	
@@ -501,7 +519,7 @@ async function scrapeMediaPage(page, db, author) {
 
 				// check if we've scrolled down the entire page
 
-				if (nothingFound === 3 || totalHeight >= scrollHeight) {
+				if (nothingFound === 6 || distance === 0) {
 					clearInterval(timer);
 					resolve(unseenPosts);
 				}
