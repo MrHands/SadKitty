@@ -141,6 +141,8 @@ async function downloadMedia(url, index, author, post) {
 
 	logger(`Downloading "${dstPath.split('/').pop()}"...`);
 
+	let timeStart = Date.now();
+
 	const downloader = new Downloader({
 		url: url,
 		directory: authorPath,
@@ -152,10 +154,16 @@ async function downloadMedia(url, index, author, post) {
 			return false;
 		},
 		onProgress: (percentage, _chunk, _remainingSize) => {
-			const before = Math.floor(percentage / 10);
-			const after = 10 - before;
+			if (Date.now() - timeStart < 10 * 1000) {
+				return;
+			}
 
-			console.log(`[ ${'#'.repeat(before)}${'.'.repeat(after)} ] ${percentage}%`);
+			timeStart = Date.now();
+
+			const barBefore = Math.floor(percentage / 10);
+			const barAfter = 10 - barBefore;
+
+			console.log(`[ ${'#'.repeat(barBefore)}${'.'.repeat(barAfter)} ] ${percentage}%`);
 		}
 	});
 
