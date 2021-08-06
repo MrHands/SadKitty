@@ -12,7 +12,35 @@ function logger(message) {
 
 // authentication
 
-const auth = require('./auth.json');
+let auth;
+try {
+	auth = require('./auth.json');
+} catch (error) {
+	logger('Missing auth.json file!');
+	logger('Create the file in this folder with the following:');
+	logger({
+		username: 'me@mine.com',
+		password: 'supersecure'
+	});
+	process.exit(0);
+}
+
+// authors
+
+let authorData = [];
+try {
+	authorData = require('./authors.json');
+} catch (error) {
+	logger('Missing authors.json file!');
+	logger('Create an authors.json in this folder:');
+	logger([
+		{
+			id: 'found_in_the_onlyfans_url',
+			name: 'How you want the Artist to appear'
+		}
+	]);
+	process.exit(0);
+}
 
 // database
 
@@ -92,10 +120,6 @@ db.run(`CREATE TABLE IF NOT EXISTS Media (
 	file_path TEXT
 )`);
 
-// load authors
-
-const authorData = require('./authors.json');
-
 // scraping
 
 async function getPageElement(page, selector, timeout = 100) {
@@ -150,7 +174,7 @@ async function downloadMedia(url, index, author, post) {
 		maxAttempts: 3,
 		cloneFiles: true, // don't overwrite existing files
 		shouldStop: (error) => {
-			console.log(error);
+			logger(error);
 			return false;
 		},
 		onProgress: (percentage, _chunk, _remainingSize) => {
@@ -163,7 +187,7 @@ async function downloadMedia(url, index, author, post) {
 			const barBefore = Math.floor(percentage / 10);
 			const barAfter = 10 - barBefore;
 
-			console.log(`[ ${'#'.repeat(barBefore)}${'.'.repeat(barAfter)} ] ${percentage}%`);
+			logger(`[ ${'#'.repeat(barBefore)}${'.'.repeat(barAfter)} ] ${percentage}%`);
 		}
 	});
 
