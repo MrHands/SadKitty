@@ -519,7 +519,7 @@ async function scrapeMediaPage(page, db, author) {
 
 				// check if we've scrolled down the entire page
 
-				if (nothingFound === 3 || totalHeight >= scrollHeight) {
+				if (nothingFound === 6 || distance === 0) {
 					clearInterval(timer);
 					resolve(unseenPosts);
 				}
