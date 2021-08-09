@@ -589,7 +589,17 @@ async function scrapeMediaPage(page, db, author) {
 
 				// check if we've scrolled down the entire page
 
-				if (nothingFound === 6 || distance === 0) {
+				if (seenPosts.length === 0) {
+					if (distance === 0) {
+						nothingFound = 5;
+					} else {
+						nothingFound = 0;
+					}
+				}
+
+				// check if timer expired
+
+				if (nothingFound === 5) {
 					clearInterval(timer);
 					resolve(unseenPosts);
 				}
@@ -741,14 +751,18 @@ if (Options.deleteAuthor) {
 		let allPosts = [];
 
 		await dbAllPromise('SELECT * FROM Post WHERE author_id = ?', Options.deleteAuthor).then((authorPosts) => {
-			allPosts = authorPosts.map((post) => post.id);
+			if (authorPosts) {
+				allPosts = authorPosts.map((post) => post.id);
+			}
 		});
 
 		let allMedia = [];
 
 		for (const id of allPosts) {
 			await dbGetPromise('SELECT * FROM Media WHERE post_id = ?', id).then((media) => {
-				allMedia.push(media);
+				if (media) {
+					allMedia.push(media);
+				}
 			});
 		}
 
