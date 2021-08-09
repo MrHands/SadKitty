@@ -159,7 +159,9 @@ async function downloadMedia(url, index, author, post) {
 		fileName += ` (${index + 1})`;
 	}
 
-	let dstPath = authorPath + '/' + fileName + '.' + extension;
+	fileName += '.' + extension;
+
+	let dstPath = authorPath + '/' + fileName;
 
 	// download file
 
@@ -170,7 +172,7 @@ async function downloadMedia(url, index, author, post) {
 	const downloader = new Downloader({
 		url: url,
 		directory: authorPath,
-		fileName: fileName + '.' + extension,
+		fileName: fileName,
 		maxAttempts: 3,
 		cloneFiles: true, // don't overwrite existing files
 		shouldStop: (error) => {
@@ -193,6 +195,7 @@ async function downloadMedia(url, index, author, post) {
 
 	try {
 		await downloader.download();
+		await fs.promises.copyFile(dstPath, './downloads/new/' + fileName);
 		logger(`Succeeded.`);
 		return dstPath;
 	} catch (error) {
