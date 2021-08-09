@@ -2,6 +2,7 @@ const fs = require('fs');
 const puppeteer = require('puppeteer');
 const { Database } = require('sqlite3');
 const Downloader = require('nodejs-file-downloader');
+const rimraf = require('rimraf');
 
 // logging
 
@@ -9,6 +10,20 @@ function logger(message) {
 	const now = new Date(Date.now());
 	console.log(`[${('0' + now.getHours()).slice(-2)}:${('0' + now.getMinutes()).slice(-2)}:${('0' + now.getSeconds()).slice(-2)}]`, message);
 }
+
+// rimraf
+
+const rimrafPromise = (path, options = {}) => {
+	return new Promise((resolve, reject) => {
+		rimraf(path, options, (error) => {
+			if (error) {
+				return reject(error);
+			}
+
+			resolve(path);
+		})
+	})
+};
 
 // authentication
 
@@ -605,8 +620,6 @@ async function scrape() {
 		});
 	}
 
-	// logger(authors);
-
 	// open browser
 
 	let browser = await puppeteer.launch({
@@ -668,6 +681,14 @@ async function scrape() {
 	}
 
 	logger('Logged in.');
+
+	// clear downloads
+
+	logger('Clearing downloads folder.');
+
+	await rimrafPromise('./downloads/new');
+
+	fs.mkdirSync('./downloads/new', { recursive: true });
 
 	// scrape media pages
 

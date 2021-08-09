@@ -16,6 +16,7 @@
     "jsdom": "^16.7.0",
     "nodejs-file-downloader": "^4.7.2",
     "puppeteer": "^10.1.0",
+    "rimraf": "^3.0.2",
     "sqlite3": "^5.0.2"
   }
 }
