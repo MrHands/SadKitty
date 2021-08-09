@@ -3,6 +3,7 @@ const puppeteer = require('puppeteer');
 const { Database } = require('sqlite3');
 const Downloader = require('nodejs-file-downloader');
 const rimraf = require('rimraf');
+const commandLineArgs = require('command-line-args');
 
 // logging
 
@@ -11,7 +12,34 @@ function logger(message) {
 	console.log(`[${('0' + now.getHours()).slice(-2)}:${('0' + now.getMinutes()).slice(-2)}:${('0' + now.getSeconds()).slice(-2)}]`, message);
 }
 
-// rimraf
+// command-line
+
+const cmdLineOptions = [
+	{
+		name: 'verbose',
+		alias: 'v',
+		type: Boolean
+	},
+	{
+		name: 'deleteAuthor',
+		type: String
+	},
+];
+const Options = commandLineArgs(cmdLineOptions);
+
+// files
+
+const fsUnlinkPromise = (path) => {
+	return new Promise((resolve, reject) => {
+		fs.unlink(path, (error) => {
+			if (error) {
+				return reject(error);
+			}
+
+			resolve(path);
+		});
+	});
+}
 
 const rimrafPromise = (path, options = {}) => {
 	return new Promise((resolve, reject) => {
@@ -21,8 +49,8 @@ const rimrafPromise = (path, options = {}) => {
 			}
 
 			resolve(path);
-		})
-	})
+		});
+	});
 };
 
 // authentication
@@ -705,4 +733,46 @@ async function scrape() {
 
 	process.exit(0);
 }
-scrape();
+
+if (Options.deleteAuthor) {
+	(async function() {
+		logger(`Deleting "${Options.deleteAuthor}"...`);
+
+		let allPosts = [];
+
+		await dbAllPromise('SELECT * FROM Post WHERE author_id = ?', Options.deleteAuthor).then((authorPosts) => {
+			allPosts = authorPosts.map((post) => post.id);
+		});
+
+		let allMedia = [];
+
+		for (const id of allPosts) {
+			await dbGetPromise('SELECT * FROM Media WHERE post_id = ?', id).then((media) => {
+				allMedia.push(media);
+			});
+		}
+
+		logger(`Deleting ${allMedia.length} file(s)...`);
+
+		for (const media of allMedia) {
+			await fsUnlinkPromise(media.file_path);
+			await dbRunPromise('DELETE FROM Media WHERE id = ?', media.id);
+		}
+
+		logger(`Deleting ${allPosts.length} post(s)...`);
+
+		for (const id of allPosts) {
+			await dbRunPromise('DELETE FROM Post WHERE id = ?', id);
+		}
+
+		await dbRunPromise('DELETE FROM Author WHERE id = ?', Options.deleteAuthor);
+
+		logger(`Deleted "${Options.deleteAuthor}".`);
+
+		db.close();
+
+		process.exit(0);
+	})();
+} else {
+	scrape();
+}
