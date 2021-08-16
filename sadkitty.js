@@ -195,6 +195,8 @@ async function downloadMedia(url, index, author, post) {
 		fileName = fileName.substr(0, 80);
 	}
 
+	fileName = `[${author.id}] ` + fileName;
+
 	const postMatch = post.url.match(/.*\/(\d+).*/);
 	fileName += ` [${postMatch[1]}]`;
 
@@ -203,8 +205,6 @@ async function downloadMedia(url, index, author, post) {
 	}
 
 	fileName += '.' + extension;
-
-	let dstPath = authorPath + '/' + fileName;
 
 	// download file
 
