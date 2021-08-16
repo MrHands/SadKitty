@@ -206,6 +206,8 @@ async function downloadMedia(url, index, author, post) {
 
 	fileName += '.' + extension;
 
+	let dstPath = authorPath + '/' + fileName;
+
 	// download file
 
 	logger(`Downloading "${dstPath.split('/').pop()}"...`);
