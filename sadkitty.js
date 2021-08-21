@@ -190,6 +190,7 @@ async function downloadMedia(url, index, author, post) {
 
 	let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\|\. ]/g, '_');
 	fileName = encodeURIComponent(fileName);
+	fileName = fileName.replace(/_/g, ' ');
 
 	if (fileName.length > 80) {
 		fileName = fileName.substr(0, 80);
