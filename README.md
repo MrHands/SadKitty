@@ -1,4 +1,8 @@
-SadKitty is a back-up tool for content you've bought on [OnlyFans.com](https://onlyfans.com). Handy when said content is scheduled to disappear on _October 1st, 2021_.
+# SadKitty
+
+SadKitty is a back-up tool for content you've bought on [OnlyFans.com](https://onlyfans.com).
+
+Handy when said content is scheduled to disappear on _October 1st, 2021_.
 
 **IMPORTANT**: SadKitty cannot access content from creators you haven't subscribed to!
 
@@ -19,6 +23,19 @@ Now you can run the following command to scrape posts from your favorite creator
     npm run scrape
 
 Happy scraping!
+
+# Managing your creators
+
+After running the setup step with `nmp run setup`, you will have generated an `authors.json` file that looks like something like this:
+
+	[
+		{
+			"id": "onlyfans_creator_id",
+			"name": "OnlyFans Creator"
+		}
+	]
+
+You can add and remove creators to the file using JSON syntax and SadKitty will scrape them in the order you've specified.
 
 # How it works
 
