@@ -4,12 +4,28 @@ const { Database } = require('sqlite3');
 const Downloader = require('nodejs-file-downloader');
 const rimraf = require('rimraf');
 const commandLineArgs = require('command-line-args');
+const readline = require('readline');
 
 // logging
 
 function logger(message) {
 	const now = new Date(Date.now());
 	console.log(`[${('0' + now.getHours()).slice(-2)}:${('0' + now.getMinutes()).slice(-2)}:${('0' + now.getSeconds()).slice(-2)}]`, message);
+}
+
+// readline
+
+const rl = readline.createInterface({
+	input: process.stdin,
+	output: process.stdout
+});
+
+const readQuestionPromise = (question) => {
+	return new Promise((resolve, _reject) => {
+		rl.question(question, (answer) => {
+			return resolve(answer);
+		});
+	});
 }
 
 // command-line
@@ -23,6 +39,10 @@ const cmdLineOptions = [
 	{
 		name: 'deleteAuthor',
 		type: String
+	},
+	{
+		name: 'setup',
+		type: Boolean
 	},
 ];
 const Options = commandLineArgs(cmdLineOptions);
@@ -52,38 +72,6 @@ const rimrafPromise = (path, options = {}) => {
 		});
 	});
 };
-
-// authentication
-
-let auth;
-try {
-	auth = require('./auth.json');
-} catch (error) {
-	logger('Missing auth.json file!');
-	logger('Create the file in this folder with the following:');
-	logger({
-		username: 'me@mine.com',
-		password: 'supersecure'
-	});
-	process.exit(0);
-}
-
-// authors
-
-let authorData = [];
-try {
-	authorData = require('./authors.json');
-} catch (error) {
-	logger('Missing authors.json file!');
-	logger('Create an authors.json in this folder:');
-	logger([
-		{
-			id: 'found_in_the_onlyfans_url',
-			name: 'How you want the Artist to appear'
-		}
-	]);
-	process.exit(0);
-}
 
 // database
 
@@ -644,10 +632,48 @@ async function scrapeMediaPage(page, db, author) {
 	}
 }
 
+async function setup() {
+	logger('Setting up authentication for OnlyFans.');
+	const username = await readQuestionPromise('Username: ');
+	const password = await readQuestionPromise('Password: ');
+	logger(`Saved as 'auth.json'`);
+
+	process.exit(0);
+}
+
 async function scrape() {
+	// authentication
+
+	let auth;
+	try {
+		auth = require('./auth.json');
+	} catch (error) {
+		logger('Missing auth.json file!');
+		logger('Create the file in this folder with the following:');
+		logger({
+			username: 'me@mine.com',
+			password: 'supersecure'
+		});
+		process.exit(0);
+	}
+
 	// get authors
 
 	let authors = [];
+	let authorData = [];
+	try {
+		authorData = require('./authors.json');
+	} catch (error) {
+		logger('Missing authors.json file!');
+		logger('Create an authors.json in this folder:');
+		logger([
+			{
+				id: 'found_in_the_onlyfans_url',
+				name: 'How you want the Artist to appear'
+			}
+		]);
+		process.exit(0);
+	}
 
 	for (const data of authorData) {
 		await dbRunPromise(`INSERT OR IGNORE INTO Author (id, name, url) VALUES (?, ?, ?)`, [
@@ -747,7 +773,9 @@ async function scrape() {
 	process.exit(0);
 }
 
-if (Options.deleteAuthor) {
+if (Options.setup) {
+	setup();
+} else if (Options.deleteAuthor) {
 	(async function() {
 		logger(`Deleting "${Options.deleteAuthor}"...`);
 

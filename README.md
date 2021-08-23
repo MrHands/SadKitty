@@ -4,7 +4,7 @@ SadKitty is a back-up tool for content you've bought on [OnlyFans.com](https://o
 
 # Getting started
 
-SadKitty requires [https://nodejs.org](https://nodejs.org) to be installed.
+SadKitty requires [NPM](https://nodejs.org) to be installed.
 
 Open a command-line window in the project directory and install dependencies:
 

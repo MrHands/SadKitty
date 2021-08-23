@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "scrape": "node sadkitty.js",
+    "setup": "node sadkitty.js --setup",
     "db": ".\\tools\\sqlite3.exe storage.db"
   },
   "author": "",
