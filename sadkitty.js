@@ -634,9 +634,26 @@ async function scrapeMediaPage(page, db, author) {
 
 async function setup() {
 	logger('Setting up authentication for OnlyFans.');
-	const username = await readQuestionPromise('Username: ');
-	const password = await readQuestionPromise('Password: ');
-	logger(`Saved as 'auth.json'`);
+
+	const auth = {
+		username: await readQuestionPromise('Username: '),
+		password: await readQuestionPromise('Password: ')
+	};
+	fs.writeFileSync('auth.json', JSON.stringify(auth));
+	logger('Saved as "auth.json"');
+
+	logger('Which creator would you like to scrape?');
+
+	const authors = [
+		{
+			name: await readQuestionPromise('Name of creator: '),
+			id: await readQuestionPromise('OnlyFans identifier for creator (https://onlyfans.com/<their_creator_id>): ')
+		}
+	];
+	fs.writeFileSync('authors.json', JSON.stringify(authors));
+	logger('Saved as "authors.json"');
+
+	logger('Ready to start scraping!');
 
 	process.exit(0);
 }
@@ -649,7 +666,7 @@ async function scrape() {
 		auth = require('./auth.json');
 	} catch (error) {
 		logger('Missing auth.json file!');
-		logger('Create the file in this folder with the following:');
+		logger('Create an "auth.json" file in this folder with the following:');
 		logger({
 			username: 'me@mine.com',
 			password: 'supersecure'
@@ -665,7 +682,7 @@ async function scrape() {
 		authorData = require('./authors.json');
 	} catch (error) {
 		logger('Missing authors.json file!');
-		logger('Create an authors.json in this folder:');
+		logger('Create an "authors.json" in this folder:');
 		logger([
 			{
 				id: 'found_in_the_onlyfans_url',
