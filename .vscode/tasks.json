@@ -1,16 +1,30 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"type": "npm",
-			"script": "scrape",
-			"problemMatcher": [],
-			"label": "npm: scrape",
-			"detail": "node sadkitty.js",
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			}
-		}
-	]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "npm",
+            "script": "scrape",
+            "problemMatcher": [],
+            "label": "npm: scrape",
+            "detail": "node sadkitty.js",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "type": "npm",
+            "script": "install",
+            "problemMatcher": [],
+            "label": "npm: install",
+            "detail": "install dependencies from package"
+        },
+        {
+            "type": "npm",
+            "script": "setup",
+            "problemMatcher": [],
+            "label": "npm: setup",
+            "detail": "node sadkitty.js --setup"
+        }
+    ]
 }

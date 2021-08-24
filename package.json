@@ -1,24 +1,27 @@
 {
-  "name": "sadkitty",
-  "version": "1.0.0",
-  "description": "",
-  "main": "sadkitty.js",
-  "scripts": {
-    "scrape": "node sadkitty.js",
-    "setup": "node sadkitty.js --setup",
-    "db": ".\\tools\\sqlite3.exe storage.db"
-  },
-  "author": "Mr. Hands",
-  "license": "ISC",
-  "dependencies": {
-    "command-line-args": "^5.2.0",
-    "fs": "0.0.1-security",
-    "https": "^1.0.0",
-    "isomorphic-fetch": "^3.0.0",
-    "jsdom": "^16.7.0",
-    "nodejs-file-downloader": "^4.7.2",
-    "puppeteer": "^10.1.0",
-    "rimraf": "^3.0.2",
-    "sqlite3": "^5.0.2"
-  }
+    "name": "sadkitty",
+    "version": "1.0.1",
+    "description": "",
+    "main": "sadkitty.js",
+    "type": "module",
+    "scripts": {
+        "scrape": "node sadkitty.js",
+        "setup": "node sadkitty.js --setup",
+        "db": ".\\tools\\sqlite3.exe storage.db"
+    },
+    "author": "Mr. Hands",
+    "license": "ISC",
+    "dependencies": {
+        "chalk": "^4.1.2",
+        "command-line-args": "^5.2.0",
+        "fs": "0.0.1-security",
+        "https": "^1.0.0",
+        "isomorphic-fetch": "^3.0.0",
+        "jsdom": "^16.7.0",
+        "nodejs-file-downloader": "^4.7.2",
+        "prompts": "^2.4.1",
+        "puppeteer": "^10.1.0",
+        "rimraf": "^3.0.2",
+        "sqlite3": "^5.0.2"
+    }
 }
