@@ -125,17 +125,15 @@ async function getPageElement(page, selector, timeout = 100) {
 
 async function downloadMedia(url, index, author, post) {
     // create directories
-
     const authorPath = `./downloads/${author.id}`;
 
-    fs.stat(authorPath, (err) => {
-        if (err) {
-            fs.mkdir(authorPath, { recursive: true });
-        }
-    });
+    try {
+        await fs.mkdir(authorPath, { recursive: true });
+    } catch (err) {
+        logger(err, 'error');
+    }
 
     // get path
-
     const encoded = new URL(url);
     const extension = encoded.pathname.split('.').pop();
 
@@ -510,6 +508,8 @@ async function scrapeMediaPage(page, db, author) {
         await new Promise((resolve, _reject) => {
             let totalHeight = 0;
             let nothingFound = 0;
+            const MAX_ATTEMPTS = 10;
+            let repeatAttempts = 0;
 
             let timer = setInterval(() => {
                 let scrollHeight = document.body.scrollHeight;
@@ -536,8 +536,10 @@ async function scrapeMediaPage(page, db, author) {
                 if (foundUnseen.length === 0) {
                     nothingFound += 1;
                     console.log(`Counter: ${nothingFound}`);
+                    repeatAttempts++;
                 } else {
                     nothingFound = 0;
+                    repeatAttempts = 0;
                 }
 
                 unseenPosts = unseenPosts.concat(foundUnseen);
@@ -554,9 +556,10 @@ async function scrapeMediaPage(page, db, author) {
                     }
                 }
 
-                // check if timer expired
+                // check if no posts have been found after multiple retries
 
-                if (nothingFound === 5) {
+                // check if timer expired
+                if (nothingFound === 5 || repeatAttempts === MAX_ATTEMPTS) {
                     clearInterval(timer);
                     resolve(unseenPosts);
                 }
@@ -580,7 +583,7 @@ async function scrapeMediaPage(page, db, author) {
 
     logger(`Found ${unseenPosts.length} post(s).`);
 
-    scrapingFailed = [];
+    const scrapingFailed = [];
 
     for (const [index, id] of unseenPosts.entries()) {
         const url = `https://onlyfans.com/${id}/${author.id}`;
@@ -721,35 +724,39 @@ async function setup() {
 
 async function scrape() {
     // authentication
-
     let auth;
     try {
-        auth = require('./auth.json');
+        auth = JSON.parse((await fs.readFile('auth.json')) || {});
+        if (Object.keys(auth).length !== 2) throw new Error();
     } catch (error) {
-        logger('Missing auth.json file!');
+        logger('Missing authentication data!', 'error');
         logger('Create an "auth.json" file in this folder with the following:');
-        logger({
-            username: 'me@mine.com',
-            password: 'supersecure',
-        });
+        logger(
+            JSON.stringify({
+                username: 'me@mine.com',
+                password: 'supersecure',
+            })
+        );
         process.exit(0);
     }
 
     // get authors
-
     let authors = [];
     let authorData = [];
     try {
-        authorData = require('./authors.json');
+        authorData = JSON.parse((await fs.readFile('authors.json')) || {});
+        if (!Object.keys(authorData)) throw new Error();
     } catch (error) {
-        logger('Missing authors.json file!', 'error');
+        logger("Missing creator's data!", 'error');
         logger('Create an "authors.json" in this folder:');
-        logger([
-            {
-                id: 'found_in_the_onlyfans_url',
-                name: 'How you want the Artist to appear',
-            },
-        ]);
+        logger(
+            JSON.stringify([
+                {
+                    id: 'found_in_the_onlyfans_url',
+                    name: 'How you want the Artist to appear',
+                },
+            ])
+        );
         process.exit(0);
     }
 
@@ -766,7 +773,6 @@ async function scrape() {
     }
 
     // open browser
-
     let browser = await puppeteer.launch({
         headless: false,
     });
@@ -810,7 +816,6 @@ async function scrape() {
     for (attempt = 1; attempt < 6; attempt++) {
         try {
             await page.waitForSelector('.user_posts', { timeout: 60 * 1000 });
-
             break;
         } catch {
             if (attempt > 1) {
@@ -833,7 +838,7 @@ async function scrape() {
 
     await rimrafPromise('./downloads/new');
 
-    fs.mkdirSync('./downloads/new', { recursive: true });
+    fs.mkdir('./downloads/new', { recursive: true });
 
     // scrape media pages
 
@@ -841,7 +846,11 @@ async function scrape() {
 
     for (const i in authors) {
         const author = authors[i];
-        await scrapeMediaPage(page, db, author);
+        try {
+            await scrapeMediaPage(page, db, author);
+        } catch (e) {
+            logger('Unexpected error occured', 'error');
+        }
     }
 
     logger('Done.');
