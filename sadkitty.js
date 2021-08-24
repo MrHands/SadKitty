@@ -137,9 +137,10 @@ async function downloadMedia(url, index, author, post) {
     const encoded = new URL(url);
     const extension = encoded.pathname.split('.').pop();
 
+    /** @type {String} */
     let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\|\. ]/g, '_');
     fileName = encodeURIComponent(fileName);
-    fileName = fileName.replace(/_/g, ' ');
+    fileName = fileName.replace(/_/g, ' ').replace(/%[\w]{2}/g, '');
 
     if (fileName.length > 80) {
         fileName = fileName.substr(0, 80);
@@ -157,7 +158,15 @@ async function downloadMedia(url, index, author, post) {
     fileName += '.' + extension;
 
     let dstPath = authorPath + '/' + fileName;
-
+    try {
+        const stats = await fs.stat(dstPath);
+        if (Object.keys(stats || {}).length == 0) {
+            logger('File already exists! Skipping...', 'info');
+            throw new Error();
+        }
+    } catch {
+        return '';
+    }
     // download file
 
     logger(`Downloading "${dstPath.split('/').pop()}"...`);
