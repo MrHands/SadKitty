@@ -8,7 +8,7 @@ Handy when said content is scheduled to disappear on _October 1st, 2021_.
 
 # Getting started
 
-SadKitty requires [NPM](https://nodejs.org) to be installed.
+SadKitty requires [Node v14 LTS](https://nodejs.org) or higher to be installed.
 
 Open a command-line window in the project directory and install dependencies:
 
@@ -26,13 +26,14 @@ Happy scraping!
 
 # Managing your creators
 
-After running the setup step with `nmp run setup`, you will have generated an `authors.json` file that looks like something like this:
+After running the setup step with `npm run setup`, you will have generated an `authors.json` file that looks like something like this:
 
 	[
 		{
 			"id": "onlyfans_creator_id",
 			"name": "OnlyFans Creator"
 		}
+		...
 	]
 
 You can add and remove creators to the file using JSON syntax and SadKitty will scrape them in the order you've specified.
