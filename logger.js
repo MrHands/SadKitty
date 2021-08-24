@@ -3,23 +3,28 @@ import chalk from 'chalk';
 export const LEVELS = {
     'fatal': {
         priority: 0,
-        chalkFunction: chalk.red.bgBlack
+        chalkFunction: chalk.red.bgBlack,
+        prefix: '[FATAL]',
     },
     'error': {
         priority: 1,
-        chalkFunction: chalk.red.bgBlack
+        chalkFunction: chalk.red.bgBlack,
+        prefix: '[ERROR]',
     },
     'warn': {
         priority: 2,
-        chalkFunction: chalk.yellow.bgBlack
+        chalkFunction: chalk.yellow.bgBlack,
+        prefix: '[WARN]',
     },
     'info': {
         priority: 3,
-        chalkFunction: chalk.white.bgBlack
+        chalkFunction: chalk.white.bgBlack,
+        prefix: '',
     },
     'trace': {
         priority: 4,
-        chalkFunction: chalk.white.bgBlack
+        chalkFunction: chalk.white.bgBlack,
+        prefix: '',
     }
 };
 
@@ -37,9 +42,9 @@ export const logger = {
     },
 
     logLevel: function (level, message) {
-        const { priority, chalkFunction } = LEVELS[level];
+        const { priority, chalkFunction, prefix } = LEVELS[level];
         if (priority >= this.lowest && priority <= this.highest) {
-            this.log(chalkFunction, message);
+            this.log(chalkFunction, [prefix, message].join(' '));
         }
     },
 
