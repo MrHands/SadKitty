@@ -4,17 +4,17 @@ export const LEVELS = {
     'fatal': {
         priority: 0,
         chalkFunction: chalk.red.bgBlack,
-        prefix: '[FATAL]',
+        prefix: '[FATAL] ',
     },
     'error': {
         priority: 1,
         chalkFunction: chalk.red.bgBlack,
-        prefix: '[ERROR]',
+        prefix: '[ERROR] ',
     },
     'warn': {
         priority: 2,
         chalkFunction: chalk.yellow.bgBlack,
-        prefix: '[WARN]',
+        prefix: '[WARN] ',
     },
     'info': {
         priority: 3,
@@ -44,7 +44,7 @@ export const logger = {
     logLevel: function (level, message) {
         const { priority, chalkFunction, prefix } = LEVELS[level];
         if (priority >= this.lowest && priority <= this.highest) {
-            this.log(chalkFunction, [prefix, message].join(' '));
+            this.log(chalkFunction, [prefix, message].join(''));
         }
     },
 
