@@ -90,26 +90,26 @@ function getCleanUrl(source) {
 // schema
 
 db.run(`CREATE TABLE IF NOT EXISTS Author (
-	id TEXT PRIMARY KEY,
-	name TEXT NOT NULL,
-	url TEXT
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    url TEXT
 )`);
 
 db.run(`CREATE TABLE IF NOT EXISTS Post (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	author_id TEXT NOT NULL,
-	url TEXT NOT NULL,
-	description TEXT,
-	timestamp TEXT,
-	locked INTEGER,
-	cache_media_count INTEGER
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    author_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    description TEXT,
+    timestamp TEXT,
+    locked INTEGER,
+    cache_media_count INTEGER
 )`);
 
 db.run(`CREATE TABLE IF NOT EXISTS Media (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	post_id INTEGER NOT NULL,
-	url TEXT NOT NULL,
-	file_path TEXT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    file_path TEXT
 )`);
 
 // scraping
@@ -140,7 +140,7 @@ async function downloadMedia(url, index, author, post) {
     /** @type {String} */
     let fileName = post.description.replace(/[\\\/\:\*\?\"\<\>\|\. ]/g, '_');
     fileName = encodeURIComponent(fileName);
-    fileName = fileName.replace(/_/g, ' ').replace(/%[\w]{2}/g, '');
+    fileName = fileName.replace(/_/g, ' ');
 
     if (fileName.length > 80) {
         fileName = fileName.substr(0, 80);
@@ -157,16 +157,8 @@ async function downloadMedia(url, index, author, post) {
 
     fileName += '.' + extension;
 
-    let dstPath = authorPath + '/' + fileName;
-    try {
-        const stats = await fs.stat(dstPath);
-        if (Object.keys(stats || {}).length == 0) {
-            logger('File already exists! Skipping...', 'info');
-            throw new Error();
-        }
-    } catch {
-        return '';
-    }
+    const dstPath = authorPath + '/' + fileName;
+
     // download file
 
     logger(`Downloading "${dstPath.split('/').pop()}"...`);
@@ -376,13 +368,13 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
     if (post.id === 0) {
         await dbRunPromise(
             `INSERT INTO Post (
-			author_id,
-			url,
-			description,
-			timestamp,
-			locked,
-			cache_media_count
-		) VALUES (?, ?, ?, ?, ?, ?)`,
+            author_id,
+            url,
+            description,
+            timestamp,
+            locked,
+            cache_media_count
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
             [author.id, post.url, encodeURIComponent(post.description), post.date, post.locked, post.mediaCount]
         );
 
@@ -402,9 +394,9 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
     for (const source of post.sources) {
         await dbGetPromise(
             `SELECT *
-		FROM Media
-		WHERE post_id = ?
-		AND url = ?`,
+            FROM Media
+            WHERE post_id = ?
+            AND url = ?`,
             [post.id, getCleanUrl(source)]
         ).then((row) => {
             if (!row) {
@@ -429,8 +421,8 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 
             await dbRunPromise(
                 `UPDATE Post
-			SET cache_media_count = ?
-			WHERE id = ?`,
+                SET cache_media_count = ?
+                WHERE id = ?`,
                 [post.mediaCount, post.id]
             );
 
@@ -438,10 +430,10 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 
             await dbRunPromise(
                 `INSERT INTO Media (
-				post_id,
-				url,
-				file_path
-			) VALUES (?, ?, ?)`,
+                post_id,
+                url,
+                file_path
+                ) VALUES (?, ?, ?)`,
                 [post.id, getCleanUrl(source), filePath]
             );
 
@@ -452,8 +444,8 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 
         await dbRunPromise(
             `UPDATE Post
-		SET cache_media_count = ?
-		WHERE id = ?`,
+            SET cache_media_count = ?
+            WHERE id = ?`,
             [post.mediaCount, post.id]
         );
     }
@@ -501,9 +493,9 @@ async function scrapeMediaPage(page, db, author) {
 
     await dbAllPromise(
         `SELECT *
-		FROM Post
-		WHERE author_id = ?
-		AND cache_media_count > 0`,
+        FROM Post
+        WHERE author_id = ?
+        AND cache_media_count > 0`,
         author.id
     ).then((rows) => {
         seenPosts = rows.map((row) => Number(row.url.match(/.*\/(\d+).*/)[1]));
@@ -517,8 +509,7 @@ async function scrapeMediaPage(page, db, author) {
         await new Promise((resolve, _reject) => {
             let totalHeight = 0;
             let nothingFound = 0;
-            const MAX_ATTEMPTS = 10;
-            let repeatAttempts = 0;
+            const MAX_ATTEMPTS = 5;
 
             let timer = setInterval(() => {
                 let scrollHeight = document.body.scrollHeight;
@@ -543,12 +534,10 @@ async function scrapeMediaPage(page, db, author) {
                 console.log(`Found ${foundUnseen.length} new posts...`);
 
                 if (foundUnseen.length === 0) {
-                    nothingFound += 1;
+                    nothingFound++;
                     console.log(`Counter: ${nothingFound}`);
-                    repeatAttempts++;
                 } else {
                     nothingFound = 0;
-                    repeatAttempts = 0;
                 }
 
                 unseenPosts = unseenPosts.concat(foundUnseen);
@@ -559,7 +548,7 @@ async function scrapeMediaPage(page, db, author) {
 
                 if (seenPosts.length === 0) {
                     if (distance === 0) {
-                        nothingFound = 5;
+                        nothingFound = MAX_ATTEMPTS;
                     } else {
                         nothingFound = 0;
                     }
@@ -567,8 +556,7 @@ async function scrapeMediaPage(page, db, author) {
 
                 // check if no posts have been found after multiple retries
 
-                // check if timer expired
-                if (nothingFound === 5 || repeatAttempts === MAX_ATTEMPTS) {
+                if (nothingFound === MAX_ATTEMPTS) {
                     clearInterval(timer);
                     resolve(unseenPosts);
                 }
