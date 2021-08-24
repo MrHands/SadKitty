@@ -2,13 +2,13 @@
   "name": "sadkitty",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "sadkitty.js",
   "scripts": {
     "scrape": "node sadkitty.js",
     "setup": "node sadkitty.js --setup",
     "db": ".\\tools\\sqlite3.exe storage.db"
   },
-  "author": "",
+  "author": "Mr. Hands",
   "license": "ISC",
   "dependencies": {
     "command-line-args": "^5.2.0",
