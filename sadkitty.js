@@ -7,15 +7,15 @@ import rimraf from 'rimraf';
 import prompts from 'prompts';
 import chalk from 'chalk';
 
-import { LOG_TYPES, CMD_LINE_OPTIONS } from './constants.js';
-import { logger } from './util.js';
-
-const { Database } = sqlite3;
+import { CMD_LINE_OPTIONS } from './constants.js';
+import { logger } from './logger.js';
 
 // command-line
+
 const Options = commandLineArgs(CMD_LINE_OPTIONS);
 
 // files
+
 const fsUnlinkPromise = async (path) => {
     return fs
         .unlink(path)
@@ -36,15 +36,16 @@ const rimrafPromise = (path, options = {}) => {
 };
 
 // database
+
 fs.stat('./storage.db', (err) => {
     if (err) {
-        let db = new Database('./storage.db', (_err) => {
+        let db = new sqlite3.Database('./storage.db', (_err) => {
             db.close();
         });
     }
 });
 
-let db = new Database('./storage.db');
+let db = new sqlite3.Database('./storage.db');
 
 const dbGetPromise = (sql, ...params) => {
     return new Promise((resolve, reject) => {
@@ -130,7 +131,7 @@ async function downloadMedia(url, index, author, post) {
     try {
         await fs.mkdir(authorPath, { recursive: true });
     } catch (err) {
-        logger(err, 'error');
+        logger.error(err);
     }
 
     // get path
@@ -161,7 +162,7 @@ async function downloadMedia(url, index, author, post) {
 
     // download file
 
-    logger(`Downloading "${dstPath.split('/').pop()}"...`);
+    logger.info(`Downloading "${dstPath.split('/').pop()}"...`);
 
     let timeStart = Date.now();
 
@@ -172,7 +173,7 @@ async function downloadMedia(url, index, author, post) {
         maxAttempts: 3,
         cloneFiles: true, // don't overwrite existing files
         shouldStop: (error) => {
-            logger(error);
+            logger.error(error);
             return false;
         },
         onProgress: (percentage, _chunk, _remainingSize) => {
@@ -185,30 +186,30 @@ async function downloadMedia(url, index, author, post) {
             const barBefore = Math.floor(percentage / 10);
             const barAfter = 10 - barBefore;
 
-            logger(`[ ${'#'.repeat(barBefore)}${'.'.repeat(barAfter)} ] ${percentage}%`);
+            logger.info(`[ ${'#'.repeat(barBefore)}${'.'.repeat(barAfter)} ] ${percentage}%`);
         },
     });
 
     try {
         await downloader.download();
         await fs.copyFile(dstPath, './downloads/new/' + fileName);
-        logger(`Succeeded.`);
+        logger.info(`Succeeded.`);
         return dstPath;
     } catch (error) {
-        logger(`Failed to download: ${error.message}`);
+        logger.error(`Failed to download: ${error.message}`);
         return '';
     }
 }
 
 async function scrapePost(page, url, author, postIndex, postTotal) {
-    logger(`(${postIndex + 1} / ${postTotal}) Scraping sources from "${url}"...`);
+    logger.info(`(${postIndex + 1} / ${postTotal}) Scraping sources from "${url}"...`);
 
     // load page and wait for post to appear
 
     let attempt = 1;
     for (attempt = 1; attempt < 4; ++attempt) {
         if (attempt > 1) {
-            logger(`Attempt ${attempt + 1} to scrape page...`);
+            logger.warn(`Attempt ${attempt + 1} to scrape page...`);
         }
 
         try {
@@ -223,14 +224,14 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 
             break;
         } catch (errors) {
-            logger('Failed to load page: ' + errors.message);
+            logger.error('Failed to load page: ' + errors.message);
 
             await page.reload();
         }
     }
 
     if (attempt >= 3) {
-        logger(`Failed to load "${url}", continuing.`);
+        logger.error(`Failed to load "${url}", continuing.`);
 
         return 0;
     }
@@ -239,19 +240,19 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 
     for (attempt = 1; attempt < 4; ++attempt) {
         if (attempt > 1) {
-            logger(`Attempt ${attempt} to scrape sources...`);
+            logger.warn(`Attempt ${attempt} to scrape sources...`);
         }
 
         // get video
 
         const eleVideo = await getPageElement(page, '.video-js button', 1000);
         if (eleVideo) {
-            logger('Found video.');
+            logger.info('Found video.');
 
             try {
                 eleVideo.click();
             } catch {
-                logger('Failed to click play button.');
+                logger.error('Failed to click play button.');
                 continue;
             }
 
@@ -267,7 +268,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
                 }
             }
 
-            logger(`Grabbing source at "${quality}" quality.`);
+            logger.info(`Grabbing source at "${quality}" quality.`);
 
             try {
                 const videoSource = await page.$eval(`video > source[label="${quality}"]`, (element) =>
@@ -277,7 +278,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
                     sources.push(videoSource);
                 }
             } catch (error) {
-                logger('Failed to grab source: ' + error.message);
+                logger.error('Failed to grab source: ' + error.message);
                 continue;
             }
         }
@@ -286,7 +287,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 
         const eleSwiper = await getPageElement(page, '.swiper-wrapper', 1000);
         if (eleSwiper) {
-            logger('Found multiple images.');
+            logger.info('Found multiple images.');
 
             try {
                 const found = await page.$$eval('img[draggable="false"]', (elements) =>
@@ -298,14 +299,14 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
                     }
                 });
             } catch (error) {
-                logger('Failed to grab source: ' + error.message);
+                logger.error('Failed to grab source: ' + error.message);
                 continue;
             }
         }
 
         const eleImage = await getPageElement(page, '.img-responsive', 1000);
         if (eleImage) {
-            logger('Found single image.');
+            logger.info('Found single image.');
 
             try {
                 const imageSource = await page.$eval('.img-responsive', (element) => element.getAttribute('src'));
@@ -313,7 +314,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
                     sources.push(imageSource);
                 }
             } catch (error) {
-                logger('Failed to grab source: ' + error.message);
+                logger.error('Failed to grab source: ' + error.message);
                 continue;
             }
         }
@@ -357,7 +358,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 
     const eleLocked = await getPageElement(page, '.post-purchase');
     if (eleLocked) {
-        logger('Post is locked.');
+        logger.warn('Post is locked.');
 
         // b-post__price
         post.locked = 1;
@@ -384,7 +385,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
     }
 
     if (post.sources.length === 0) {
-        logger('Nothing to download.');
+        logger.warn('Nothing to download.');
 
         return 1;
     }
@@ -406,7 +407,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
     }
 
     if (queue.length > 0) {
-        logger(`Queueing ${queue.length} download(s)...`);
+        logger.info(`Queueing ${queue.length} download(s)...`);
 
         let index = 0;
         for (const source of queue) {
@@ -454,14 +455,14 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 }
 
 async function scrapeMediaPage(page, db, author) {
-    logger(`Checking posts from ${author.name}...`);
+    logger.info(`Checking posts from ${author.name}...`);
 
     // wait for page to load
 
     let attempt = 1;
     for (attempt = 1; attempt < 4; ++attempt) {
         if (attempt > 1) {
-            logger(`Attempt ${attempt} to load media page...`);
+            logger.info(`Attempt ${attempt} to load media page...`);
         }
 
         try {
@@ -475,14 +476,14 @@ async function scrapeMediaPage(page, db, author) {
 
             break;
         } catch (errors) {
-            logger('Failed to load page: ' + errors.message);
+            logger.error('Failed to load page: ' + errors.message);
 
             await page.reload();
         }
     }
 
     if (attempt >= 3) {
-        logger('Failed to scrape media page.');
+        logger.error('Failed to scrape media page.');
 
         return;
     }
@@ -569,7 +570,7 @@ async function scrapeMediaPage(page, db, author) {
     // get posts
 
     if (unseenPosts.length === 0) {
-        logger('All posts seen.');
+        logger.info('All posts seen.');
 
         return;
     }
@@ -578,7 +579,7 @@ async function scrapeMediaPage(page, db, author) {
 
     unseenPosts.reverse();
 
-    logger(`Found ${unseenPosts.length} post(s).`);
+    logger.info(`Found ${unseenPosts.length} post(s).`);
 
     const scrapingFailed = [];
 
@@ -590,30 +591,29 @@ async function scrapeMediaPage(page, db, author) {
         }
     }
 
-    logger(`Scraped ${unseenPosts.length} post(s) from ${author.name}.`);
+    logger.info(`Scraped ${unseenPosts.length} post(s) from ${author.name}.`);
 
     if (scrapingFailed.length > 0) {
-        logger(`Failed to scrape:`);
-        logger(scrapingFailed);
+        logger.error(`Failed to scrape: ${scrapingFailed}`);
     }
 }
 
 async function setup() {
     const onCancel = () => process.exit(0);
 
-    logger('Setting up authentication for OnlyFans.', LOG_TYPES.warning);
-    logger('Checking for existing authentication data...', LOG_TYPES.info);
+    logger.warn('Setting up authentication for OnlyFans.\n');
+
+    logger.info('Checking for existing authentication data...\n');
+
     let existingAuthData = { username: '', password: '' };
     try {
         existingAuthData = JSON.parse((await fs.readFile('auth.json', { encoding: 'utf8' })) || {});
-        if (Object.keys(existingAuthData || {}).length > 0)
-            logger(
-                'Auth data found! Existing data will be shown in brackets. Feel free to skip any prompt by pressing enter.\n',
-                LOG_TYPES.info
-            );
+        if (Object.keys(existingAuthData || {}).length > 0) {
+            logger.info('Auth data found! Skip prompts for input by pressing Enter.\n');
+        }
     } catch (err) {
         // Error logs could be hidden behind a command line flag in the future
-        logger(`Error parsing file ▶ ${err}`);
+        logger.error(`Error parsing file ▶ ${err}`);
     }
 
     const { username, password } = existingAuthData;
@@ -639,26 +639,24 @@ async function setup() {
     const auth = await prompts(authQuestions, { onCancel });
 
     await fs.writeFile('auth.json', JSON.stringify(auth));
-    logger('Saved as "auth.json"\n', 'warning');
+    
+    logger.info('Saved as "auth.json"\n');
 
     /** @type {{ name: String, id: String}[]} */
     let existingCreatorData;
     try {
         existingCreatorData = JSON.parse((await fs.readFile('authors.json', { encoding: 'utf8' })) || {});
         if (Object.keys(existingCreatorData || {}).length > 0)
-            logger(
-                'You already have some creators already stored! Existing data will be shown in brackets. Feel free to skip any prompt by pressing enter.\n',
-                LOG_TYPES.info
-            );
+            logger.info('Existing creator data will be shown in brackets. Skip prompts for input by pressing Enter.\n');
     } catch (err) {
         // Error logs could be hidden behind a command line flag in the future
-        logger(`Error parsing file ▶ ${err}\n`);
+        logger.error(`Error parsing file ▶ ${err}`);
     }
 
     const existingCreatorCount = existingCreatorData ? Object.keys(existingCreatorData || {}).length : 1;
     const formattedCreatorCount = existingCreatorData ? chalk.yellow.bgBlack` (${existingCreatorCount})` : '';
 
-    logger('How many creators would you like to scrape?');
+    logger.info('How many creators would you like to scrape?');
     const numCreatorsQ = await prompts(
         {
             name: 'response',
@@ -666,7 +664,9 @@ async function setup() {
             message: `Number of creators${formattedCreatorCount}: `,
             initial: existingCreatorCount,
         },
-        { onCancel }
+        {
+            onCancel
+        }
     );
 
     /** @type {import('prompts').PromptObject<string>[]} */
@@ -712,9 +712,10 @@ async function setup() {
 
     await prompts(creatorQuestions, { onCancel, onSubmit });
     await fs.writeFile('authors.json', JSON.stringify(authors));
-    logger('Saved as "authors.json"', 'warning');
 
-    logger('Ready to start scraping!', 'info');
+    logger.info('Saved as "authors.json"\n');
+
+    logger.info('Ready to start scraping!');
 
     process.exit(0);
 }
@@ -726,8 +727,8 @@ async function scrape() {
         auth = JSON.parse((await fs.readFile('auth.json')) || {});
         if (Object.keys(auth).length !== 2) throw new Error();
     } catch (error) {
-        logger('Missing authentication data!', 'error');
-        logger('Create an "auth.json" file in this folder with the following:');
+        logger.error('Missing authentication data!');
+        logger.info('Create an "auth.json" file in this folder with the following:');
         logger(
             JSON.stringify({
                 username: 'me@mine.com',
@@ -744,8 +745,8 @@ async function scrape() {
         authorData = JSON.parse((await fs.readFile('authors.json')) || {});
         if (!Object.keys(authorData)) throw new Error();
     } catch (error) {
-        logger("Missing creator's data!", 'error');
-        logger('Create an "authors.json" in this folder:');
+        logger.error("Missing creator's data!");
+        logger.info('Create an "authors.json" in this folder:');
         logger(
             JSON.stringify([
                 {
@@ -774,7 +775,7 @@ async function scrape() {
         headless: false,
     });
     browser.on('disconnected', async () => {
-        logger('Connection lost.', 'error');
+        logger.error('Connection lost.');
 
         await browser.close();
 
@@ -792,7 +793,7 @@ async function scrape() {
         height: 720,
     });
 
-    logger('Loading main page...');
+    logger.info('Loading main page...');
 
     await page.goto('https://onlyfans.com', {
         waitUntil: 'domcontentloaded',
@@ -801,13 +802,13 @@ async function scrape() {
 
     // log in using twitter
 
-    logger('Logging in...');
+    logger.info('Logging in...');
 
     await page.type('input[name="email"]', auth.username, { delay: 10 });
     await page.type('input[name="password"]', auth.password, { delay: 10 });
     await page.click('button[type="submit"]');
 
-    logger('Waiting for reCAPTCHA...');
+    logger.info('Waiting for reCAPTCHA...');
 
     let attempt = 1;
     for (attempt = 1; attempt < 6; attempt++) {
@@ -816,22 +817,22 @@ async function scrape() {
             break;
         } catch {
             if (attempt > 1) {
-                logger(`Checking for reCAPTCHA again in 1 minute...`, 'warning');
+                logger.warn(`Checking for reCAPTCHA again in 1 minute...`);
             }
         }
     }
 
     if (attempt >= 5) {
-        logger('Timed out on reCAPTCHA.');
+        logger.error('Timed out on reCAPTCHA.');
 
         process.exit(0);
     }
 
-    logger('Logged in.');
+    logger.info('Logged in.');
 
     // clear downloads
 
-    logger('Clearing downloads folder.');
+    logger.info('Clearing downloads folder.');
 
     await rimrafPromise('./downloads/new');
 
@@ -839,18 +840,18 @@ async function scrape() {
 
     // scrape media pages
 
-    logger(`Visiting ${authors.length} author(s).`);
+    logger.info(`Visiting ${authors.length} author(s).`);
 
     for (const i in authors) {
         const author = authors[i];
         try {
             await scrapeMediaPage(page, db, author);
-        } catch (e) {
-            logger('Unexpected error occured', 'error');
+        } catch (err) {
+            logger.error(`Unexpected error occured ▶ ${err}`);
         }
     }
 
-    logger('Done.');
+    logger.info('Done.');
 
     db.close();
 
@@ -861,7 +862,7 @@ if (Options.setup) {
     setup();
 } else if (Options.deleteAuthor) {
     (async function () {
-        logger(`Deleting "${Options.deleteAuthor}"...`);
+        logger.info(`Deleting "${Options.deleteAuthor}"...`);
 
         let allPosts = [];
 
@@ -881,14 +882,14 @@ if (Options.setup) {
             });
         }
 
-        logger(`Deleting ${allMedia.length} file(s)...`);
+        logger.info(`Deleting ${allMedia.length} file(s)...`);
 
         for (const media of allMedia) {
             await fsUnlinkPromise(media.file_path);
             await dbRunPromise('DELETE FROM Media WHERE id = ?', media.id);
         }
 
-        logger(`Deleting ${allPosts.length} post(s)...`);
+        logger.info(`Deleting ${allPosts.length} post(s)...`);
 
         for (const id of allPosts) {
             await dbRunPromise('DELETE FROM Post WHERE id = ?', id);
@@ -896,7 +897,7 @@ if (Options.setup) {
 
         await dbRunPromise('DELETE FROM Author WHERE id = ?', Options.deleteAuthor);
 
-        logger(`Deleted "${Options.deleteAuthor}".`);
+        logger.info(`Deleted "${Options.deleteAuthor}".`);
 
         db.close();
 
