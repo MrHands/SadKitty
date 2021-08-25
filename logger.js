@@ -57,6 +57,10 @@ export const logger = {
         this.logLevel('error', message);
     },
 
+    warn: function (message) {
+        this.logLevel('warn', message);
+    },
+
     info: function (message) {
         this.logLevel('info', message);
     },
