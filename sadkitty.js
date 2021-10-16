@@ -236,11 +236,35 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
         return 0;
     }
 
+    // set up post
+
+    let post = {
+        id: 0,
+        description: '',
+        date: '',
+        url: url,
+        sources: sources,
+        mediaCount: 0,
+        locked: 0,
+    };
+
+    // get sources
+
     let sources = [];
 
     for (attempt = 1; attempt < 4; ++attempt) {
         if (attempt > 1) {
             logger.warn(`Attempt ${attempt} to scrape sources...`);
+        }
+
+        // check if post is locked
+
+        const eleLocked = await getPageElement(page, '.b-profile__restricted__icon', 1000);
+        if (eleLocked) {
+            logger.info('Post locked, continuing.');
+            post.locked = 1;
+
+            break;
         }
 
         // get video
@@ -324,15 +348,6 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
         }
     }
 
-    // set up post
-
-    let post = {
-        id: 0,
-        url: url,
-        sources: sources,
-        mediaCount: 0,
-    };
-
     // get id
 
     await dbGetPromise('SELECT id, cache_media_count FROM Post WHERE url = ?', [url]).then((row) => {
@@ -353,16 +368,6 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
     // get timestamp
 
     post.date = await page.$eval('.b-post__date > span', (element) => element.innerText);
-
-    // check if locked
-
-    const eleLocked = await getPageElement(page, '.post-purchase');
-    if (eleLocked) {
-        logger.warn('Post is locked.');
-
-        // b-post__price
-        post.locked = 1;
-    }
 
     // create new post
 
@@ -787,7 +792,7 @@ async function scrape() {
     });
 
     const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0');
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:93.0) Gecko/20100101 Firefox/93.0');
     await page.setViewport({
         width: 1280,
         height: 720,
