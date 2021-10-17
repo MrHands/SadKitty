@@ -21,6 +21,8 @@
         "nodejs-file-downloader": "^4.7.2",
         "prompts": "^2.4.1",
         "puppeteer": "^10.1.0",
+        "puppeteer-extra": "^3.2.3",
+        "puppeteer-extra-plugin-stealth": "^2.9.0",
         "rimraf": "^3.0.2",
         "sqlite3": "^4.2.0"
     }

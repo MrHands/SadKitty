@@ -1,11 +1,12 @@
 import fs from 'fs/promises';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
 import sqlite3 from 'sqlite3';
 import Downloader from 'nodejs-file-downloader';
 import commandLineArgs from 'command-line-args';
 import rimraf from 'rimraf';
 import prompts from 'prompts';
 import chalk from 'chalk';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
 import { CMD_LINE_OPTIONS } from './constants.js';
 import { logger } from './logger.js';
@@ -727,6 +728,7 @@ async function setup() {
 
 async function scrape() {
     // authentication
+
     let auth;
     try {
         auth = JSON.parse((await fs.readFile('auth.json')) || {});
@@ -744,6 +746,7 @@ async function scrape() {
     }
 
     // get authors
+
     let authors = [];
     let authorData = [];
     try {
@@ -775,9 +778,23 @@ async function scrape() {
         });
     }
 
+    // hide puppeteer usage
+
+    puppeteer.use(StealthPlugin());
+
     // open browser
+
     let browser = await puppeteer.launch({
+        ignoreHTTPSErrors: true,
         headless: false,
+        args: [
+            '--window-size=1920,1080',
+            '--window-position=000,000',
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-web-security',
+            '--disable-features=site-per-process',
+        ],
     });
     browser.on('disconnected', async () => {
         logger.error('Connection lost.');
@@ -791,12 +808,7 @@ async function scrape() {
         process.exit(0);
     });
 
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:93.0) Gecko/20100101 Firefox/93.0');
-    await page.setViewport({
-        width: 1280,
-        height: 720,
-    });
+    const [ page ] = await browser.pages();
 
     logger.info('Loading main page...');
 
