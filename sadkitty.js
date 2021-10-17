@@ -244,14 +244,12 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
         description: '',
         date: '',
         url: url,
-        sources: sources,
+        sources: [],
         mediaCount: 0,
         locked: 0,
     };
 
     // get sources
-
-    let sources = [];
 
     for (attempt = 1; attempt < 4; ++attempt) {
         if (attempt > 1) {
@@ -299,8 +297,8 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
                 const videoSource = await page.$eval(`video > source[label="${quality}"]`, (element) =>
                     element.getAttribute('src')
                 );
-                if (!sources.includes(videoSource)) {
-                    sources.push(videoSource);
+                if (!post.sources.includes(videoSource)) {
+                    post.sources.push(videoSource);
                 }
             } catch (error) {
                 logger.error('Failed to grab source: ' + error.message);
@@ -319,8 +317,8 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
                     elements.map((image) => image.getAttribute('src'))
                 );
                 found.forEach((imageSource) => {
-                    if (!sources.includes(imageSource)) {
-                        sources.push(imageSource);
+                    if (!post.sources.includes(imageSource)) {
+                        post.sources.push(imageSource);
                     }
                 });
             } catch (error) {
@@ -335,8 +333,8 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 
             try {
                 const imageSource = await page.$eval('.img-responsive', (element) => element.getAttribute('src'));
-                if (!sources.includes(imageSource)) {
-                    sources.push(imageSource);
+                if (!post.sources.includes(imageSource)) {
+                    post.sources.push(imageSource);
                 }
             } catch (error) {
                 logger.error('Failed to grab source: ' + error.message);
@@ -344,7 +342,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
             }
         }
 
-        if (sources.length > 0) {
+        if (post.sources.length > 0) {
             break;
         }
     }
