@@ -118,6 +118,24 @@ db.run(`CREATE TABLE IF NOT EXISTS Media (
 
 let lastUrl = '';
 let browser = null;
+let loggedIn = false;
+
+const waitForBrowserPromise = () => {
+    return new Promise((resolve) => {
+        if (browser !== null && loggedIn) {
+            return resolve();
+        }
+
+        const checkBrowser = setInterval(() => {
+            logger.info('Checking for browser...');
+
+            if (browser !== null && loggedIn) {
+                clearInterval(checkBrowser);
+                resolve();
+            }
+        }, 1000);
+    });
+}
 
 async function getPageElement(page, selector, timeout = 100) {
     try {
@@ -211,6 +229,8 @@ async function scrapePost(url, author, postIndex, postTotal) {
     logger.info(`(${postIndex + 1} / ${postTotal}) Scraping sources from "${url}"...`);
 
     lastUrl = url;
+
+    await waitForBrowserPromise();
     const [ page ] = await browser.pages();
 
     // load page and wait for post to appear
@@ -469,6 +489,7 @@ async function scrapePost(url, author, postIndex, postTotal) {
 async function scrapeMediaPage(db, author) {
     logger.info(`Checking posts from ${author.name}...`);
 
+    await waitForBrowserPromise();
     const [ page ] = await browser.pages();
 
     // wait for page to load
@@ -798,6 +819,9 @@ async function scrape() {
     // open browser
 
     let createBrowser = async () => {
+        browser = null;
+        loggedIn = false;
+
         logger.info('Launching browser...');
 
         browser = await puppeteer.launch({
@@ -857,11 +881,14 @@ async function scrape() {
     
         logger.info('Logged in.');
 
+        loggedIn = true;
+
         if (lastUrl !== '') {
             logger.warn(`Loading "${lastUrl}" again...`);
 
             await page.goto(lastUrl, {
                 waitUntil: 'domcontentloaded',
+                timeout: 10 * 1000
             });
         }
     }
