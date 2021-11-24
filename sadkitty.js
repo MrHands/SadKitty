@@ -116,6 +116,9 @@ db.run(`CREATE TABLE IF NOT EXISTS Media (
 
 // scraping
 
+let lastUrl = '';
+let browser = null;
+
 async function getPageElement(page, selector, timeout = 100) {
     try {
         const element = await page.waitForSelector(selector, { timeout: timeout });
@@ -127,6 +130,7 @@ async function getPageElement(page, selector, timeout = 100) {
 
 async function downloadMedia(url, index, author, post) {
     // create directories
+
     const authorPath = `./downloads/${author.id}`;
 
     try {
@@ -136,6 +140,7 @@ async function downloadMedia(url, index, author, post) {
     }
 
     // get path
+
     const encoded = new URL(url);
     const extension = encoded.pathname.split('.').pop();
 
@@ -202,8 +207,11 @@ async function downloadMedia(url, index, author, post) {
     }
 }
 
-async function scrapePost(page, url, author, postIndex, postTotal) {
+async function scrapePost(url, author, postIndex, postTotal) {
     logger.info(`(${postIndex + 1} / ${postTotal}) Scraping sources from "${url}"...`);
+
+    lastUrl = url;
+    const [ page ] = await browser.pages();
 
     // load page and wait for post to appear
 
@@ -458,8 +466,10 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
     return post.mediaCount;
 }
 
-async function scrapeMediaPage(page, db, author) {
+async function scrapeMediaPage(db, author) {
     logger.info(`Checking posts from ${author.name}...`);
+
+    const [ page ] = await browser.pages();
 
     // wait for page to load
 
@@ -589,8 +599,13 @@ async function scrapeMediaPage(page, db, author) {
 
     for (const [index, id] of unseenPosts.entries()) {
         const url = `https://onlyfans.com/${id}/${author.id}`;
-        const scraped = await scrapePost(page, url, author, index, unseenPosts.length);
-        if (scraped < 1) {
+        try {
+            const scraped = await scrapePost(url, author, index, unseenPosts.length);
+            if (scraped < 1) {
+                scrapingFailed.push(url);
+            }
+        } catch (error) {
+            logger.error(`Caught error while scraping "${url}": ${error}`);
             scrapingFailed.push(url);
         }
     }
@@ -782,9 +797,9 @@ async function scrape() {
 
     // open browser
 
-    let browser = null;
-
     let createBrowser = async () => {
+        logger.info('Launching browser...');
+
         browser = await puppeteer.launch({
             ignoreHTTPSErrors: true,
             headless: false,
@@ -802,48 +817,56 @@ async function scrape() {
 
             await createBrowser();
         });
-    }
 
-    await createBrowser();
+        const [ page ] = await browser.pages();
 
-    const [ page ] = await browser.pages();
-
-    logger.info('Loading main page...');
-
-    await page.goto('https://onlyfans.com', {
-        waitUntil: 'domcontentloaded',
-    });
-    await page.waitForSelector('form.b-loginreg__form');
-
-    // log in using twitter
-
-    logger.info('Logging in...');
-
-    await page.type('input[name="email"]', auth.username, { delay: 10 });
-    await page.type('input[name="password"]', auth.password, { delay: 10 });
-    await page.click('button[type="submit"]');
-
-    logger.info('Waiting for reCAPTCHA...');
-
-    let attempt = 1;
-    for (attempt = 1; attempt < 6; attempt++) {
-        try {
-            await page.waitForSelector('.user_posts', { timeout: 60 * 1000 });
-            break;
-        } catch (error) {
-            if (attempt > 1) {
-                logger.warn(`Checking for reCAPTCHA again in 1 minute...`);
+        logger.info('Loading main page...');
+    
+        await page.goto('https://onlyfans.com', {
+            waitUntil: 'domcontentloaded',
+        });
+        await page.waitForSelector('form.b-loginreg__form');
+    
+        // log in using twitter
+    
+        logger.info('Logging in...');
+    
+        await page.type('input[name="email"]', auth.username, { delay: 10 });
+        await page.type('input[name="password"]', auth.password, { delay: 10 });
+        await page.click('button[type="submit"]');
+    
+        logger.info('Waiting for reCAPTCHA...');
+    
+        let attempt = 1;
+        for (attempt = 1; attempt < 6; attempt++) {
+            try {
+                await page.waitForSelector('.user_posts', { timeout: 60 * 1000 });
+                break;
+            } catch (error) {
+                if (attempt > 1) {
+                    logger.warn(`Checking for reCAPTCHA again in 1 minute...`);
+                }
             }
+        }
+    
+        if (attempt >= 5) {
+            logger.error('Timed out on reCAPTCHA.');
+    
+            process.exit(0);
+        }
+    
+        logger.info('Logged in.');
+
+        if (lastUrl !== '') {
+            logger.warn(`Loading "${lastUrl}" again...`);
+
+            await page.goto(lastUrl, {
+                waitUntil: 'domcontentloaded',
+            });
         }
     }
 
-    if (attempt >= 5) {
-        logger.error('Timed out on reCAPTCHA.');
-
-        process.exit(0);
-    }
-
-    logger.info('Logged in.');
+    await createBrowser();
 
     // clear downloads
 
@@ -860,9 +883,9 @@ async function scrape() {
     for (const i in authors) {
         const author = authors[i];
         try {
-            await scrapeMediaPage(page, db, author);
+            await scrapeMediaPage(db, author);
         } catch (error) {
-            logger.error(`Unexpected error occured ▶ ${error}`);
+            logger.error(`Caught error while scraping page for ${author.name}: ${error}`);
         }
     }
 
