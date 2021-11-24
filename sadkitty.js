@@ -120,10 +120,10 @@ let lastUrl = '';
 let browser = null;
 let loggedIn = false;
 
-const waitForBrowserPromise = () => {
+const waitForPagePromise = () => {
     return new Promise((resolve) => {
         if (browser !== null && loggedIn) {
-            return resolve();
+            return resolve(browser);
         }
 
         const checkBrowser = setInterval(() => {
@@ -131,9 +131,14 @@ const waitForBrowserPromise = () => {
 
             if (browser !== null && loggedIn) {
                 clearInterval(checkBrowser);
-                resolve();
+                resolve(browser);
             }
         }, 1000);
+    }).then((resolved) => {
+        return resolved.pages().then((pages) => {
+            const [ page ] = pages;
+            return page;
+        });
     });
 }
 
@@ -229,9 +234,7 @@ async function scrapePost(url, author, postIndex, postTotal) {
     logger.info(`(${postIndex + 1} / ${postTotal}) Scraping sources from "${url}"...`);
 
     lastUrl = url;
-
-    await waitForBrowserPromise();
-    const [ page ] = await browser.pages();
+    const page = await waitForPagePromise();
 
     // load page and wait for post to appear
 
@@ -489,8 +492,7 @@ async function scrapePost(url, author, postIndex, postTotal) {
 async function scrapeMediaPage(db, author) {
     logger.info(`Checking posts from ${author.name}...`);
 
-    await waitForBrowserPromise();
-    const [ page ] = await browser.pages();
+    const page = await waitForPagePromise();
 
     // wait for page to load
 
