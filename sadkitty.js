@@ -120,7 +120,7 @@ async function getPageElement(page, selector, timeout = 100) {
     try {
         const element = await page.waitForSelector(selector, { timeout: timeout });
         return element;
-    } catch {
+    } catch (error) {
         return null;
     }
 }
@@ -131,7 +131,7 @@ async function downloadMedia(url, index, author, post) {
 
     try {
         await fs.mkdir(authorPath, { recursive: true });
-    } catch (err) {
+    } catch (error) {
         logger.error(err);
     }
 
@@ -274,8 +274,8 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
 
             try {
                 eleVideo.click();
-            } catch {
-                logger.error('Failed to click play button.');
+            } catch (error) {
+                logger.error(`Failed to click play button: ${error.message}`);
                 continue;
             }
 
@@ -286,7 +286,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
                     await page.waitForSelector(`video > source[label="${qualityLevels[q]}"]`, { timeout: 2000 });
                     quality = qualityLevels[q];
                     break;
-                } catch {
+                } catch (error) {
                     continue;
                 }
             }
@@ -301,7 +301,7 @@ async function scrapePost(page, url, author, postIndex, postTotal) {
                     post.sources.push(videoSource);
                 }
             } catch (error) {
-                logger.error('Failed to grab source: ' + error.message);
+                logger.error(`Failed to grab source: ${error.message}`);
                 continue;
             }
         }
@@ -615,9 +615,9 @@ async function setup() {
         if (Object.keys(existingAuthData || {}).length > 0) {
             logger.info('Auth data found! Skip prompts for input by pressing Enter.\n');
         }
-    } catch (err) {
+    } catch (error) {
         // Error logs could be hidden behind a command line flag in the future
-        logger.error(`Error parsing file ▶ ${err}`);
+        logger.error(`Error parsing file ▶ ${error}`);
     }
 
     const { username, password } = existingAuthData;
@@ -652,9 +652,9 @@ async function setup() {
         existingCreatorData = JSON.parse((await fs.readFile('authors.json', { encoding: 'utf8' })) || {});
         if (Object.keys(existingCreatorData || {}).length > 0)
             logger.info('Existing creator data will be shown in brackets. Skip prompts for input by pressing Enter.\n');
-    } catch (err) {
+    } catch (error) {
         // Error logs could be hidden behind a command line flag in the future
-        logger.error(`Error parsing file ▶ ${err}`);
+        logger.error(`Error parsing file ▶ ${error}`);
     }
 
     const existingCreatorCount = existingCreatorData ? Object.keys(existingCreatorData || {}).length : 1;
@@ -830,7 +830,7 @@ async function scrape() {
         try {
             await page.waitForSelector('.user_posts', { timeout: 60 * 1000 });
             break;
-        } catch {
+        } catch (error) {
             if (attempt > 1) {
                 logger.warn(`Checking for reCAPTCHA again in 1 minute...`);
             }
@@ -861,8 +861,8 @@ async function scrape() {
         const author = authors[i];
         try {
             await scrapeMediaPage(page, db, author);
-        } catch (err) {
-            logger.error(`Unexpected error occured ▶ ${err}`);
+        } catch (error) {
+            logger.error(`Unexpected error occured ▶ ${error}`);
         }
     }
 
@@ -876,7 +876,7 @@ async function scrape() {
 if (Options.setup) {
     setup();
 } else if (Options.deleteAuthor) {
-    (async function () {
+    (async () => {
         logger.info(`Deleting "${Options.deleteAuthor}"...`);
 
         let allPosts = [];
