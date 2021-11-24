@@ -782,29 +782,29 @@ async function scrape() {
 
     // open browser
 
-    let browser = await puppeteer.launch({
-        ignoreHTTPSErrors: true,
-        headless: false,
-        args: [
-            '--window-size=1920,1080',
-            '--window-position=000,000',
-            '--disable-dev-shm-usage',
-            '--no-sandbox',
-            '--disable-web-security',
-            '--disable-features=site-per-process',
-        ],
-    });
-    browser.on('disconnected', async () => {
-        logger.error('Connection lost.');
+    let browser = null;
 
-        await browser.close();
+    let createBrowser = async () => {
+        browser = await puppeteer.launch({
+            ignoreHTTPSErrors: true,
+            headless: false,
+            args: [
+                '--window-size=1920,1080',
+                '--window-position=000,000',
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+                '--disable-web-security',
+                '--disable-features=site-per-process',
+            ],
+        });
+        browser.on('disconnected', async () => {
+            logger.error('Connection lost, opening browser again.');
 
-        if (browser.process()) {
-            browser.process().kill('SIGINT');
-        }
+            await createBrowser();
+        });
+    }
 
-        process.exit(0);
-    });
+    await createBrowser();
 
     const [ page ] = await browser.pages();
 
