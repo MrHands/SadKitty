@@ -549,7 +549,7 @@ async function scrapeMediaPage(db, author) {
             let nothingFound = 0;
             const MAX_ATTEMPTS = 5;
 
-            let timer = setInterval(() => {
+            const timer = setInterval(() => {
                 let scrollHeight = document.body.scrollHeight;
 
                 let distance = document.body.scrollHeight - window.innerHeight - window.scrollY;
@@ -558,12 +558,15 @@ async function scrapeMediaPage(db, author) {
 
                 console.log(`scrollHeight ${scrollHeight} totalHeight ${totalHeight} distance ${distance}`);
 
-                let found = Array.from(document.querySelectorAll('.b-photos__item')).map((post) =>
-                    Number(post.getAttribute('data-id'))
-                );
+                // filter unique posts from elements
 
-                let foundUnseen = [];
-                found.forEach((id) => {
+                const found = Array.from(document.querySelectorAll('.b-photos__item'))
+                    .map(post => Number(post.getAttribute('data-id')));
+
+                const foundUnique = found.filter((id, index) => found.indexOf(id) === index);
+
+                const foundUnseen = [];
+                foundUnique.forEach((id) => {
                     if (!seenPosts.includes(id) && !unseenPosts.includes(id)) {
                         foundUnseen.push(id);
                     }
