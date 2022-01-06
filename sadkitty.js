@@ -507,7 +507,7 @@ async function scrapeMediaPage(db, author) {
                 waitUntil: 'networkidle0',
                 timeout: 10 * 1000,
             });
-            await page.waitForSelector('.user_posts', {
+            await page.waitForSelector('.b-feed-content', {
                 timeout: 10 * 1000,
             });
 
@@ -558,8 +558,8 @@ async function scrapeMediaPage(db, author) {
 
                 console.log(`scrollHeight ${scrollHeight} totalHeight ${totalHeight} distance ${distance}`);
 
-                let found = Array.from(document.querySelectorAll('.user_posts .b-post')).map((post) =>
-                    Number(post.id.match(/postId_(.+)/i)[1])
+                let found = Array.from(document.querySelectorAll('.b-photos__item')).map((post) =>
+                    Number(post.getAttribute('data-id'))
                 );
 
                 let foundUnseen = [];
