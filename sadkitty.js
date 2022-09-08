@@ -860,7 +860,9 @@ async function scrape() {
     
         logger.info('Logging in...');
     
+        await page.click('input[name="email"]');
         await page.type('input[name="email"]', auth.username, { delay: 10 });
+        await page.click('input[name="password"]');
         await page.type('input[name="password"]', auth.password, { delay: 10 });
         await page.click('button[type="submit"]');
     
